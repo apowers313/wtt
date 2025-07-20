@@ -15,6 +15,8 @@ class TestRepository {
     // Create temp directory
     this.dir = path.join(os.tmpdir(), 'wtt-tests', this.name);
     await fs.ensureDir(this.dir);
+    // Resolve symlinks to get the real path (important for macOS)
+    this.dir = await fs.realpath(this.dir);
     
     // Initialize git repo
     await this.git('init');

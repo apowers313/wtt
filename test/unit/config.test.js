@@ -13,6 +13,8 @@ describe('Config module (integration)', () => {
     
     // Create temp directory and change to it
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'config-test-'));
+    // Resolve to handle symlinks (e.g., /var -> /private/var on macOS)
+    tempDir = await fs.realpath(tempDir);
     process.chdir(tempDir);
     
     // Reset config state

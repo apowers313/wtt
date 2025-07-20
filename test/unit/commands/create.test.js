@@ -32,6 +32,7 @@ const {
   createMockFileSystem
 } = require('../../setup/mockHelpers');
 const chalk = require('chalk');
+const path = require('path');
 
 // Mock console methods
 const mockConsole = {
@@ -119,7 +120,7 @@ describe('create command', () => {
     
     // Verify .env.worktree creation
     expect(mockFs.writeFile).toHaveBeenCalledWith(
-      '.worktrees/wt-feature-test/.env.worktree',
+      path.join('.worktrees', 'wt-feature-test', '.env.worktree'),
       'VITE_PORT=3000\nSTORYBOOK_PORT=6000\nWORKTREE_NAME=wt-feature-test\n'
     );
     
@@ -187,13 +188,13 @@ describe('create command', () => {
     
     // Should read existing gitignore
     expect(mockFs.readFile).toHaveBeenCalledWith(
-      '.worktrees/wt-feature-test/.gitignore',
+      path.join('.worktrees', 'wt-feature-test', '.gitignore'),
       'utf8'
     );
     
     // Should append .env.worktree
     expect(mockFs.writeFile).toHaveBeenCalledWith(
-      '.worktrees/wt-feature-test/.gitignore',
+      path.join('.worktrees', 'wt-feature-test', '.gitignore'),
       'node_modules\n.env.worktree\n'
     );
   });
@@ -205,7 +206,7 @@ describe('create command', () => {
     
     // Should create new gitignore with .env.worktree
     expect(mockFs.writeFile).toHaveBeenCalledWith(
-      '.worktrees/wt-feature-test/.gitignore',
+      path.join('.worktrees', 'wt-feature-test', '.gitignore'),
       '\n.env.worktree\n'
     );
   });

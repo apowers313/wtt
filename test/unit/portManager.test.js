@@ -22,7 +22,7 @@ describe('PortManager (integration)', () => {
   
   afterEach(async () => {
     // Clean up temp directory
-    await fs.rmdir(tempDir, { recursive: true });
+    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   describe('init and load', () => {

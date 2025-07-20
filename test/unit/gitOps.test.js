@@ -1,6 +1,7 @@
 const { TestRepository } = require('../helpers/TestRepository');
 const gitOps = require('../../lib/gitOps');
 const path = require('path');
+const fs = require('fs').promises;
 
 describe('GitOps module (integration)', () => {
   let repo;
@@ -59,7 +60,7 @@ describe('GitOps module (integration)', () => {
       } finally {
         // Clean up
         process.chdir(repo.dir);
-        await fs.rmdir(nonGitDir, { recursive: true });
+        await fs.rm(nonGitDir, { recursive: true, force: true });
       }
     });
   });
@@ -72,7 +73,8 @@ describe('GitOps module (integration)', () => {
       
       // Verify worktree exists
       const worktrees = await gitOps.listWorktrees();
-      expect(worktrees.some(wt => wt.path === worktreePath)).toBe(true);
+      const normalizedWorktreePath = path.resolve(worktreePath);
+      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedWorktreePath)).toBe(true);
       
       // Verify branch was created
       const branches = await repo.git('branch');
@@ -90,7 +92,8 @@ describe('GitOps module (integration)', () => {
       
       // Verify worktree exists
       const worktrees = await gitOps.listWorktrees();
-      expect(worktrees.some(wt => wt.path === worktreePath)).toBe(true);
+      const normalizedWorktreePath = path.resolve(worktreePath);
+      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedWorktreePath)).toBe(true);
     });
 
     test('throws when trying to create new branch that already exists', async () => {
@@ -120,7 +123,8 @@ describe('GitOps module (integration)', () => {
       await gitOps.createWorktree(worktreePath, 'feature', 'main');
       
       // Add uncommitted changes
-      await repo.writeFile(path.join(worktreePath, 'test.txt'), 'changes');
+      const relativePath = path.relative(repo.dir, path.join(worktreePath, 'test.txt'));
+      await repo.writeFile(relativePath, 'changes');
       
       await gitOps.removeWorktree(worktreePath, true);
       
@@ -140,8 +144,10 @@ describe('GitOps module (integration)', () => {
       const worktrees = await gitOps.listWorktrees();
       
       expect(worktrees.length).toBeGreaterThanOrEqual(3); // main + 2 worktrees
-      expect(worktrees.some(wt => wt.path === wt1)).toBe(true);
-      expect(worktrees.some(wt => wt.path === wt2)).toBe(true);
+      const normalizedWt1 = path.resolve(wt1);
+      const normalizedWt2 = path.resolve(wt2);
+      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedWt1)).toBe(true);
+      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedWt2)).toBe(true);
     });
 
     test('handles empty worktree list', async () => {
@@ -150,7 +156,8 @@ describe('GitOps module (integration)', () => {
       // Should at least have the main worktree
       expect(worktrees.length).toBeGreaterThanOrEqual(1);
       // The first worktree should be the main repo
-      expect(worktrees.some(wt => wt.path === repo.dir)).toBe(true);
+      const normalizedRepoDir = path.resolve(repo.dir);
+      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedRepoDir)).toBe(true);
     });
   });
 
