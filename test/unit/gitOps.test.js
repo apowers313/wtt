@@ -2,40 +2,62 @@ const { TestRepository } = require('../helpers/TestRepository');
 const gitOps = require('../../lib/gitOps');
 const path = require('path');
 const fs = require('fs').promises;
+const { realpathSync } = require('fs');
 
 describe('GitOps module (integration)', () => {
   let repo;
   
   // Helper function to compare paths across platforms
   function pathsEqual(path1, path2) {
-    // Handle both absolute and relative paths
-    const abs1 = path.isAbsolute(path1) ? path1 : path.resolve(path1);
-    const abs2 = path.isAbsolute(path2) ? path2 : path.resolve(path2);
-    
-    // Normalize both paths to handle different formats
-    let normalized1 = abs1.replace(/\\/g, '/');
-    let normalized2 = abs2.replace(/\\/g, '/');
-    
-    // On Windows, handle short path names (8.3 format)
-    if (process.platform === 'win32') {
-      // Convert RUNNER~1 to runneradmin style comparisons
-      // Check if paths are the same except for the username part
-      const userPattern1 = /\/Users\/[^/]+\//i;
-      const userPattern2 = /\\Users\\[^\\]+\\/i;
+    try {
+      // Try to resolve real paths first (handles symlinks and short names)
+      const real1 = realpathSync(path1);
+      const real2 = realpathSync(path2);
       
-      // Extract the part after the username
-      const afterUser1 = normalized1.replace(userPattern1, '/Users/USER/');
-      const afterUser2 = normalized2.replace(userPattern1, '/Users/USER/');
+      // Normalize for comparison
+      const normalized1 = real1.replace(/\\/g, '/').toLowerCase();
+      const normalized2 = real2.replace(/\\/g, '/').toLowerCase();
       
-      if (afterUser1.toLowerCase() === afterUser2.toLowerCase()) {
+      return normalized1 === normalized2;
+    } catch (e) {
+      // If realpath fails, fall back to string comparison
+      // Handle both absolute and relative paths
+      const abs1 = path.isAbsolute(path1) ? path1 : path.resolve(path1);
+      const abs2 = path.isAbsolute(path2) ? path2 : path.resolve(path2);
+      
+      // Normalize both paths to handle different formats
+      let normalized1 = abs1.replace(/\\/g, '/').toLowerCase();
+      let normalized2 = abs2.replace(/\\/g, '/').toLowerCase();
+      
+      // Direct comparison first
+      if (normalized1 === normalized2) {
         return true;
       }
       
-      // Fall back to simple case-insensitive comparison
-      return normalized1.toLowerCase() === normalized2.toLowerCase();
+      // On Windows, handle short path names (8.3 format)
+      if (process.platform === 'win32') {
+        // Handle RUNNER~1 vs runneradmin differences
+        // Compare the path segments after the user directory
+        const segments1 = normalized1.split('/');
+        const segments2 = normalized2.split('/');
+        
+        // Find where paths diverge
+        const userIndex1 = segments1.findIndex(s => s === 'users');
+        const userIndex2 = segments2.findIndex(s => s === 'users');
+        
+        if (userIndex1 >= 0 && userIndex2 >= 0) {
+          // Compare paths after the username (skip username segment)
+          const afterUser1 = segments1.slice(userIndex1 + 2).join('/');
+          const afterUser2 = segments2.slice(userIndex2 + 2).join('/');
+          
+          if (afterUser1 === afterUser2) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
     }
-    
-    return normalized1 === normalized2;
   }
   
   // Helper to find worktree by path
@@ -220,6 +242,13 @@ describe('GitOps module (integration)', () => {
       
       // Should at least have the main worktree
       expect(worktrees.length).toBeGreaterThanOrEqual(1);
+      
+      // Debug on Windows CI
+      if (process.env.CI && process.platform === 'win32' && worktrees.length > 0) {
+        console.log('Main repo dir:', repo.dir);
+        console.log('First worktree path:', worktrees[0].path);
+      }
+      
       // The first worktree should be the main repo
       expect(hasWorktree(worktrees, repo.dir)).toBe(true);
     });
