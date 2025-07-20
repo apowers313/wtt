@@ -114,7 +114,19 @@ describe('GitOps module (integration)', () => {
     test('creates worktree for new branch with base branch', async () => {
       const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
       
-      await gitOps.createWorktree(worktreePath, 'feature', 'main');
+      // Ensure the parent directory exists
+      await fs.mkdir(path.dirname(worktreePath), { recursive: true });
+      
+      try {
+        await gitOps.createWorktree(worktreePath, 'feature', 'main');
+      } catch (error) {
+        if (process.env.CI) {
+          console.log('Failed to create worktree:', error.message);
+          console.log('Worktree path:', worktreePath);
+          console.log('Current directory:', process.cwd());
+        }
+        throw error;
+      }
       
       // Verify worktree exists
       const worktrees = await gitOps.listWorktrees();
@@ -131,6 +143,9 @@ describe('GitOps module (integration)', () => {
       await repo.git('checkout main');
       
       const worktreePath = path.join(repo.dir, '.worktrees', 'wt-existing');
+      
+      // Ensure the parent directory exists
+      await fs.mkdir(path.dirname(worktreePath), { recursive: true });
       
       await gitOps.createWorktree(worktreePath, 'existing-feature');
       
@@ -153,6 +168,7 @@ describe('GitOps module (integration)', () => {
   describe('removeWorktree', () => {
     test('removes worktree', async () => {
       const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
+      await fs.mkdir(path.dirname(worktreePath), { recursive: true });
       await gitOps.createWorktree(worktreePath, 'feature', 'main');
       
       await gitOps.removeWorktree(worktreePath);
@@ -163,6 +179,7 @@ describe('GitOps module (integration)', () => {
 
     test('force removes worktree with uncommitted changes', async () => {
       const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
+      await fs.mkdir(path.dirname(worktreePath), { recursive: true });
       await gitOps.createWorktree(worktreePath, 'feature', 'main');
       
       // Add uncommitted changes
@@ -181,6 +198,7 @@ describe('GitOps module (integration)', () => {
       const wt1 = path.join(repo.dir, '.worktrees', 'wt-feature1');
       const wt2 = path.join(repo.dir, '.worktrees', 'wt-feature2');
       
+      await fs.mkdir(path.dirname(wt1), { recursive: true });
       await gitOps.createWorktree(wt1, 'feature1', 'main');
       await gitOps.createWorktree(wt2, 'feature2', 'main');
       
