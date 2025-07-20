@@ -19,6 +19,21 @@ describe('wt switch command', () => {
     
     const result = await repo.run('switch wt-feature-test');
     
+    if (process.env.CI || process.env.DEBUG_TESTS) {
+      console.log('\n[DEBUG] switch test:');
+      console.log('  Platform:', process.platform);
+      console.log('  Exit code:', result.exitCode);
+      console.log('  STDOUT:', result.stdout);
+      console.log('  STDERR:', result.stderr);
+      console.log('  Expected path component:', path.join('.worktrees', 'wt-feature-test'));
+      
+      if (process.platform === 'win32') {
+        console.log('  Windows path separators in stdout:', result.stdout.includes('\\'));
+        console.log('  POSIX path separators in stdout:', result.stdout.includes('/'));
+        console.log('  Raw stdout bytes:', Buffer.from(result.stdout).toString('hex'));
+      }
+    }
+    
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('cd ');
     expect(result.stdout).toContain(path.join('.worktrees', 'wt-feature-test'));
@@ -36,8 +51,25 @@ describe('wt switch command', () => {
     
     const result = await repo.run('switch wt-feature-test');
     
-    expect(result.exitCode).toBe(0);
     const expectedPath = path.join(repo.dir, '.worktrees', 'wt-feature-test');
+    
+    if (process.env.CI || process.env.DEBUG_TESTS) {
+      console.log('\n[DEBUG] absolute path test:');
+      console.log('  Platform:', process.platform);
+      console.log('  Exit code:', result.exitCode);
+      console.log('  Expected path:', expectedPath);
+      console.log('  STDOUT contains expected:', result.stdout.includes(expectedPath));
+      console.log('  Full STDOUT:', result.stdout);
+      console.log('  Full STDERR:', result.stderr);
+      
+      if (process.platform === 'win32') {
+        console.log('  Expected path normalized:', expectedPath.replace(/\\/g, '/'));
+        console.log('  STDOUT normalized contains expected:', 
+          result.stdout.replace(/\\/g, '/').includes(expectedPath.replace(/\\/g, '/')));
+      }
+    }
+    
+    expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain(expectedPath);
   });
 });

@@ -46,9 +46,15 @@ jobs:
     
     - name: Run unit tests
       run: npm run test:unit
+      env:
+        DEBUG_TESTS: true
+        DEBUG_GIT: true
     
     - name: Run integration tests
       run: npm run test:integration
+      env:
+        DEBUG_TESTS: true
+        DEBUG_GIT: true
       
     - name: Run E2E tests
       run: npm run test:e2e

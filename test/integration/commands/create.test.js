@@ -15,7 +15,21 @@ describe('wt create command', () => {
   
   describe('Success cases', () => {
     test('creates worktree for new branch', async () => {
+      if (process.env.CI || process.env.DEBUG_TESTS) {
+        console.log('\n[DEBUG] Integration create test starting:');
+        console.log('  Platform:', process.platform);
+        console.log('  Working dir:', process.cwd());
+        console.log('  Repo dir:', repo.dir);
+      }
+      
       const result = await helpers.createWorktree('feature-test');
+      
+      if (process.env.CI || process.env.DEBUG_TESTS) {
+        console.log('\n[DEBUG] Create worktree result:');
+        console.log('  Exit code:', result.exitCode);
+        console.log('  STDOUT:', result.stdout);
+        console.log('  STDERR:', result.stderr);
+      }
       
       helpers.expectSuccess(result);
       helpers.expectOutputContains(result, ['worktree created', 'created worktree']);
@@ -28,6 +42,9 @@ describe('wt create command', () => {
         // Try to check for storybook port, but don't fail if it's not configured
         helpers.expectPortAssignment(result, 'storybook');
       } catch (error) {
+        if (process.env.CI || process.env.DEBUG_TESTS) {
+          console.log('  Storybook port not configured (expected):', error.message);
+        }
         // Storybook might not be configured, that's okay
       }
     });
