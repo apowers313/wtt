@@ -62,7 +62,8 @@ describe('GitOps module (integration)', () => {
     
     // Reinitialize gitOps with the test directory
     const simpleGit = require('simple-git');
-    gitOps.git = simpleGit(repo.dir);
+    // Don't pass a directory to simpleGit since we've already changed to that directory
+    gitOps.git = simpleGit();
   });
   
   afterEach(async () => {
@@ -119,11 +120,33 @@ describe('GitOps module (integration)', () => {
       
       try {
         await gitOps.createWorktree(worktreePath, 'feature', 'main');
+        
+        // On Windows CI, verify the worktree was actually created
+        if (process.env.CI && process.platform === 'win32') {
+          const exists = await fs.access(worktreePath).then(() => true).catch(() => false);
+          console.log('Worktree directory exists after creation:', exists);
+          console.log('Worktree path:', worktreePath);
+          
+          // Try listing directory contents
+          try {
+            const parentDir = path.dirname(worktreePath);
+            const contents = await fs.readdir(parentDir);
+            console.log('Contents of', parentDir, ':', contents);
+          } catch (e) {
+            console.log('Could not read parent directory');
+          }
+        }
       } catch (error) {
         if (process.env.CI) {
           console.log('Failed to create worktree:', error.message);
           console.log('Worktree path:', worktreePath);
           console.log('Current directory:', process.cwd());
+          
+          // Log the exact git command that would be run
+          const branches = await gitOps.git.branch();
+          const branchExists = branches.all.includes('feature');
+          console.log('Branch exists:', branchExists);
+          console.log('Git command would be: git worktree add', branchExists ? worktreePath + ' feature' : '-b feature ' + worktreePath + ' main');
         }
         throw error;
       }
