@@ -20,16 +20,6 @@ async function mergeCommand(worktreeName, options) {
     const worktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
     
     if (!worktree) {
-      // Add debug logging for Windows path issues
-      if (process.env.DEBUG_TESTS || process.env.CI) {
-        console.error('\n[DEBUG] Merge command - worktree not found:');
-        console.error('  Expected worktree path:', worktreePath);
-        console.error('  Available worktrees:', worktrees.map(wt => ({
-          path: wt.path,
-          normalized: PathUtils.normalize(wt.path),
-          equals: PathUtils.equals(wt.path, worktreePath)
-        })));
-      }
       throw new Error(`Worktree '${worktreeName}' not found`);
     }
     
