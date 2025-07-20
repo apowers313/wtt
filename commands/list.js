@@ -13,10 +13,13 @@ async function listCommand(options) {
     await portManager.init(config.getBaseDir());
     
     const worktrees = await gitOps.listWorktrees();
-    const managedWorktrees = worktrees.filter(wt => 
-      wt.path.includes(cfg.baseDir) && 
-      !wt.path.endsWith(process.cwd())
-    );
+    const managedWorktrees = worktrees.filter(wt => {
+      // Normalize paths for cross-platform comparison
+      const normalizedPath = path.normalize(wt.path);
+      const normalizedBaseDir = path.normalize(cfg.baseDir);
+      return normalizedPath.includes(normalizedBaseDir) && 
+        !normalizedPath.endsWith(path.normalize(process.cwd()));
+    });
     
     if (managedWorktrees.length === 0) {
       console.log(chalk.yellow('No worktrees found.'));
