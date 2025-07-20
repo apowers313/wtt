@@ -4,6 +4,7 @@ const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const { Prompter } = require('../lib/prompter');
+const PathUtils = require('../lib/pathUtils');
 
 async function removeCommand(worktreeName, options, prompter = new Prompter()) {
   try {
@@ -16,7 +17,7 @@ async function removeCommand(worktreeName, options, prompter = new Prompter()) {
     const worktreePath = config.getWorktreePath(worktreeName);
     
     const worktrees = await gitOps.listWorktrees();
-    const worktree = worktrees.find(wt => wt.path === worktreePath);
+    const worktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
     
     if (!worktree) {
       throw new Error(`Worktree '${worktreeName}' not found`);

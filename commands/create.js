@@ -5,6 +5,7 @@ const os = require('os');
 const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
+const PathUtils = require('../lib/pathUtils');
 
 async function createCommand(branchName, options) {
   try {
@@ -18,7 +19,7 @@ async function createCommand(branchName, options) {
     console.log(chalk.blue(`Creating worktree '${worktreeName}'...`));
     
     const worktrees = await gitOps.listWorktrees();
-    const existingWorktree = worktrees.find(wt => wt.path === worktreePath);
+    const existingWorktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
     if (existingWorktree) {
       throw new Error(`Worktree already exists at ${worktreePath}`);
     }

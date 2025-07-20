@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
+const PathUtils = require('../lib/pathUtils');
 
 async function removeCommand(worktreeName, options) {
   try {
@@ -17,7 +18,21 @@ async function removeCommand(worktreeName, options) {
     const worktreePath = config.getWorktreePath(worktreeName);
     
     const worktrees = await gitOps.listWorktrees();
-    const worktree = worktrees.find(wt => wt.path === worktreePath);
+    const worktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
+    
+    // Add debug logging for Windows path issues
+    if (process.env.DEBUG_TESTS || process.env.CI) {
+      console.error('\n[DEBUG] Remove command - worktree lookup:');
+      console.error('  Expected worktree path:', worktreePath);
+      console.error('  Found worktree:', !!worktree);
+      if (!worktree && worktrees.length > 0) {
+        console.error('  Available worktrees:', worktrees.map(wt => ({
+          path: wt.path,
+          normalized: PathUtils.normalize(wt.path),
+          equals: PathUtils.equals(wt.path, worktreePath)
+        })));
+      }
+    }
     
     // Check if we have tracking data even if git doesn't know about the worktree
     const ports = portManager.getPorts(worktreeName);
