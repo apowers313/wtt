@@ -21,7 +21,7 @@ describe('wt switch command', () => {
     
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('cd ');
-    expect(result.stdout).toContain('.worktrees/wt-feature-test');
+    expect(result.stdout).toContain(path.join('.worktrees', 'wt-feature-test'));
   });
 
   test('fails when worktree not found', async () => {

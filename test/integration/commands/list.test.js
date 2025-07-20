@@ -1,4 +1,5 @@
 const { WorktreeTestHelpers } = require('../../helpers/WorktreeTestHelpers');
+const path = require('path');
 
 describe('wt list command', () => {
   let repo, helpers;
@@ -30,7 +31,7 @@ describe('wt list command', () => {
     await helpers.createWorktree('feature-test');
     
     // Add a file to make it dirty
-    await repo.writeFile('.worktrees/wt-feature-test/new-file.txt', 'content');
+    await repo.writeFile(path.join('.worktrees', 'wt-feature-test', 'new-file.txt'), 'content');
     
     const result = await repo.run('list -v');
     

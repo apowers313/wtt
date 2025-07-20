@@ -1,5 +1,6 @@
 const { TestRepository } = require('../helpers/TestRepository');
 const { mockInquirer } = require('../helpers/mocks');
+const path = require('path');
 
 describe('Complete feature development workflow', () => {
   let repo;
@@ -52,10 +53,10 @@ describe('Complete feature development workflow', () => {
     expect(await repo.exists('src/awesome.js')).toBe(true);
     
     // Verify worktree is removed
-    expect(await repo.exists('.worktrees/wt-feature-awesome')).toBe(false);
+    expect(await repo.exists(path.join('.worktrees', 'wt-feature-awesome'))).toBe(false);
     
     // Verify ports are released
-    const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     expect(portMap['wt-feature-awesome']).toBeUndefined();
     
     jest.unmock('inquirer');
@@ -97,7 +98,7 @@ describe('Complete feature development workflow', () => {
     expect(listResult.stdout.toLowerCase()).toContain('clean');
     
     // Check port assignments
-    const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     expect(portMap['wt-feature-ui'].vite).toBe(3000);
     expect(portMap['wt-feature-api'].vite).toBe(3010);
     expect(portMap['wt-feature-auth'].vite).toBe(3020);

@@ -1,4 +1,5 @@
 const { TestRepository } = require('../helpers/TestRepository');
+const path = require('path');
 
 describe('Git Worktree Tool - Working Tests', () => {
   let repo;
@@ -39,7 +40,7 @@ describe('Git Worktree Tool - Working Tests', () => {
     expect(result.stdout).toContain('Assigned ports');
     
     // Check worktree exists
-    expect(await repo.exists('.worktrees/wt-test-feature')).toBe(true);
+    expect(await repo.exists(path.join('.worktrees', 'wt-test-feature'))).toBe(true);
   });
 
   test('list command shows worktrees', async () => {
@@ -73,7 +74,7 @@ describe('Git Worktree Tool - Working Tests', () => {
     
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('cd ');
-    expect(result.stdout).toContain('.worktrees/wt-test-feature');
+    expect(result.stdout).toContain(path.join('.worktrees', 'wt-test-feature'));
   });
 
   test('remove command with force flag', async () => {
@@ -86,6 +87,6 @@ describe('Git Worktree Tool - Working Tests', () => {
     expect(result.stdout).toContain('Removed worktree');
     
     // Verify worktree is gone
-    expect(await repo.exists('.worktrees/wt-test-feature')).toBe(false);
+    expect(await repo.exists(path.join('.worktrees', 'wt-test-feature'))).toBe(false);
   });
 });

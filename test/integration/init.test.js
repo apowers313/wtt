@@ -88,10 +88,10 @@ describe('wt init command', () => {
     await repo.run('init');
     
     // Check port map exists (may be created on first use rather than init)
-    const portMapExists = await repo.exists('.worktrees/.port-map.json');
+    const portMapExists = await repo.exists(path.join('.worktrees', '.port-map.json'));
     if (portMapExists) {
       // Verify it's valid JSON
-      const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+      const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
       expect(portMap).toEqual({});
     } else {
       // Port map might be created on first worktree creation instead

@@ -1,5 +1,6 @@
 const { WorktreeTestHelpers } = require('../../helpers/WorktreeTestHelpers');
 const { AsyncTestHelpers } = require('../../helpers/InteractiveTestHelpers');
+const path = require('path');
 
 describe('wt merge command', () => {
   let repo, helpers;
@@ -55,7 +56,7 @@ describe('wt merge command', () => {
     });
     
     // Verify ports are released
-    const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     expect(portMap['wt-feature-delete']).toBeUndefined();
   });
 
@@ -80,7 +81,7 @@ describe('wt merge command', () => {
     await helpers.expectWorktreeExists('feature-preserve', true);
     
     // Verify ports are still assigned
-    const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     expect(portMap['wt-feature-preserve']).toBeDefined();
   });
 

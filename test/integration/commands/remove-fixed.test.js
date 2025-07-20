@@ -1,5 +1,7 @@
 const { WorktreeTestHelpers } = require('../../helpers/WorktreeTestHelpers');
 const { AsyncTestHelpers } = require('../../helpers/InteractiveTestHelpers');
+const path = require('path');
+const fsExtra = require('fs-extra');
 
 // We'll use manual testing approach for interactive commands
 // since mocking inquirer is complex with the current architecture
@@ -21,8 +23,8 @@ describe('wt remove command (fixed)', () => {
     await helpers.createWorktree('feature-test');
     
     // Make uncommitted changes
-    const worktreePath = `.worktrees/${helpers.getWorktreeName('feature-test')}`;
-    await repo.writeFile(`${worktreePath}/uncommitted.js`, 'export const test = 1;');
+    const worktreePath = path.join('.worktrees', helpers.getWorktreeName('feature-test'));
+    await repo.writeFile(path.join(worktreePath, 'uncommitted.js'), 'export const test = 1;');
     
     // Force remove bypasses all prompts
     const result = await repo.run('remove wt-feature-test --force');
@@ -36,7 +38,7 @@ describe('wt remove command (fixed)', () => {
     });
     
     // Verify ports released
-    const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     expect(portMap['wt-feature-test']).toBeUndefined();
   });
 
@@ -52,7 +54,7 @@ describe('wt remove command (fixed)', () => {
     await helpers.createWorktree('feature-test');
     
     // Manually remove worktree directory (simulating corruption)
-    await repo.exec('rm -rf .worktrees/wt-feature-test');
+    await fsExtra.remove(path.join(repo.dir, '.worktrees', 'wt-feature-test'));
     
     // Try to remove with --force
     const result = await repo.run('remove wt-feature-test --force');
@@ -61,7 +63,7 @@ describe('wt remove command (fixed)', () => {
     helpers.expectOutputContains(result, ['removed', 'Removed']);
     
     // Verify cleanup
-    const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     expect(portMap['wt-feature-test']).toBeUndefined();
   });
 
@@ -78,7 +80,7 @@ describe('wt remove command (fixed)', () => {
     helpers.expectOutputContains(result, 'Released ports');
     
     // Verify ports released
-    const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     expect(portMap['wt-feature-test']).toBeUndefined();
   });
 

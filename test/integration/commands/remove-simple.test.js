@@ -1,5 +1,6 @@
 const { WorktreeTestHelpers } = require('../../helpers/WorktreeTestHelpers');
 const { AsyncTestHelpers } = require('../../helpers/InteractiveTestHelpers');
+const path = require('path');
 
 describe('wt remove command (simplified)', () => {
   let repo, helpers;
@@ -38,8 +39,8 @@ describe('wt remove command (simplified)', () => {
     await helpers.createWorktree('feature-test');
     
     // Add uncommitted changes
-    const worktreePath = `.worktrees/${helpers.getWorktreeName('feature-test')}`;
-    await repo.writeFile(`${worktreePath}/uncommitted.js`, 'export const test = 1;');
+    const worktreePath = path.join('.worktrees', helpers.getWorktreeName('feature-test'));
+    await repo.writeFile(path.join(worktreePath, 'uncommitted.js'), 'export const test = 1;');
     
     const result = await repo.run('remove wt-feature-test --force');
     

@@ -1,5 +1,6 @@
 const { WorktreeTestHelpers } = require('../../helpers/WorktreeTestHelpers');
 const { AsyncTestHelpers } = require('../../helpers/InteractiveTestHelpers');
+const path = require('path');
 
 describe('wt create command', () => {
   let repo, helpers;
@@ -40,7 +41,7 @@ describe('wt create command', () => {
       await helpers.expectWorktreeExists('feature-test');
       
       // Check .env.worktree - at minimum should have VITE_PORT
-      const envPath = `.worktrees/wt-feature-test/.env.worktree`;
+      const envPath = path.join('.worktrees', 'wt-feature-test', '.env.worktree');
       const envContent = await repo.readFile(envPath);
       
       // Must have at least VITE_PORT and WORKTREE_NAME

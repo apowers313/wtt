@@ -233,7 +233,7 @@ class WorktreeTestHelpers {
    */
   async expectWorktreeExists(branch, shouldExist = true) {
     const name = branch.startsWith('wt-') ? branch : `wt-${branch}`;
-    const worktreePath = `.worktrees/${name}`;
+    const worktreePath = path.join('.worktrees', name);
     
     // Retry a few times to handle timing issues
     for (let i = 0; i < 3; i++) {
@@ -281,7 +281,7 @@ class WorktreeTestHelpers {
     let portMap;
     for (let i = 0; i < 3; i++) {
       try {
-        const portMapContent = await this.repo.readFile('.worktrees/.port-map.json');
+        const portMapContent = await this.repo.readFile(path.join('.worktrees', '.port-map.json'));
         portMap = JSON.parse(portMapContent);
         break;
       } catch (error) {
@@ -308,7 +308,7 @@ class WorktreeTestHelpers {
    */
   async expectEnvFile(branch, variables) {
     const name = branch.startsWith('wt-') ? branch : `wt-${branch}`;
-    const envPath = `.worktrees/${name}/.env.worktree`;
+    const envPath = path.join('.worktrees', name, '.env.worktree');
     
     const content = await this.repo.readFile(envPath);
     

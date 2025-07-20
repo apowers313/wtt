@@ -1,6 +1,7 @@
 const { WorktreeTestHelpers } = require('../helpers/WorktreeTestHelpers');
 const { InteractiveTestHelpers, AsyncTestHelpers } = require('../helpers/InteractiveTestHelpers');
 const fs = require('fs').promises;
+const fsExtra = require('fs-extra');
 const path = require('path');
 
 describe('Error recovery scenarios', () => {
@@ -23,7 +24,7 @@ describe('Error recovery scenarios', () => {
     // Simulate partial worktree creation - create git worktree but not our tracking
     await repo.git('checkout -b broken-branch');
     await repo.git('checkout main');
-    await repo.git('worktree add .worktrees/wt-broken broken-branch');
+    await repo.git(`worktree add ${path.join('.worktrees', 'wt-broken')} broken-branch`);
     
     // Try to create same worktree again through our tool
     const result = await helpers.createWorktree('broken');
@@ -42,7 +43,7 @@ describe('Error recovery scenarios', () => {
 
   test('handles corrupted port map', async () => {
     // Create invalid port map
-    await repo.writeFile('.worktrees/.port-map.json', 'invalid json{');
+    await repo.writeFile(path.join('.worktrees', '.port-map.json'), 'invalid json{');
     
     // Try to create worktree - implementation might recover or fail
     const result = await helpers.createWorktree('feature-test');
@@ -52,7 +53,7 @@ describe('Error recovery scenarios', () => {
       await helpers.expectWorktreeExists('feature-test');
       
       // Port map should be valid now
-      const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+      const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
       expect(portMap['wt-feature-test']).toBeDefined();
     } else {
       // Failed with error about corruption
@@ -62,7 +63,7 @@ describe('Error recovery scenarios', () => {
 
   test('handles missing .worktrees directory', async () => {
     // Remove .worktrees directory after init
-    await repo.exec('rm -rf .worktrees');
+    await fsExtra.remove(path.join(repo.dir, '.worktrees'));
     
     // Create worktree - should recreate directory
     const result = await helpers.createWorktree('feature-test');
@@ -82,7 +83,7 @@ describe('Error recovery scenarios', () => {
     await helpers.createWorktree('feature-1');
     
     // Get assigned ports
-    const portMap1 = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const portMap1 = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     const vitePort1 = portMap1['wt-feature-1'].vite;
     
     // Manually add fake entry with same port
@@ -92,14 +93,14 @@ describe('Error recovery scenarios', () => {
       custom: 8000,
       created: new Date().toISOString()
     };
-    await repo.writeFile('.worktrees/.port-map.json', JSON.stringify(portMap1, null, 2));
+    await repo.writeFile(path.join('.worktrees', '.port-map.json'), JSON.stringify(portMap1, null, 2));
     
     // Create another worktree - should get different port
     const result = await helpers.createWorktree('feature-2');
     helpers.expectSuccess(result);
     
     // Verify unique port assigned
-    const finalPortMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+    const finalPortMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
     expect(finalPortMap['wt-feature-2'].vite).not.toBe(vitePort1);
   });
 
@@ -108,7 +109,7 @@ describe('Error recovery scenarios', () => {
     await helpers.createWorktree('feature-test');
     
     // Manually remove git worktree but leave our tracking
-    await repo.git('worktree remove .worktrees/wt-feature-test --force');
+    await repo.git(`worktree remove ${path.join('.worktrees', 'wt-feature-test')} --force`);
     
     // Try to remove via wt command
     const result = await repo.run('remove wt-feature-test --force');
@@ -118,7 +119,7 @@ describe('Error recovery scenarios', () => {
     
     // Verify cleanup
     await AsyncTestHelpers.retry(async () => {
-      const portMap = JSON.parse(await repo.readFile('.worktrees/.port-map.json'));
+      const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
       expect(portMap['wt-feature-test']).toBeUndefined();
     });
   });
@@ -175,7 +176,7 @@ describe('Error recovery scenarios', () => {
     await helpers.createWorktree('cleanup-test');
     
     // Simulate a failed operation by corrupting the worktree
-    const worktreePath = '.worktrees/wt-cleanup-test';
+    const worktreePath = path.join('.worktrees', 'wt-cleanup-test');
     await repo.writeFile(`${worktreePath}/.git`, 'corrupted');
     
     // Try to remove - should handle corrupted state

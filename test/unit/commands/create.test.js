@@ -77,7 +77,7 @@ describe('create command', () => {
       }
     });
     mockConfig.getWorktreeName.mockImplementation(branch => `wt-${branch}`);
-    mockConfig.getWorktreePath.mockImplementation(name => `.worktrees/${name}`);
+    mockConfig.getWorktreePath.mockImplementation(name => path.join('.worktrees', name));
     mockConfig.getBaseDir.mockReturnValue('/project');
     
     mockPortManager.init.mockResolvedValue();
@@ -105,7 +105,7 @@ describe('create command', () => {
     
     // Verify worktree creation
     expect(mockGitOps.createWorktree).toHaveBeenCalledWith(
-      '.worktrees/wt-feature-test',
+      path.join('.worktrees', 'wt-feature-test'),
       'feature-test',
       null
     );
@@ -141,7 +141,7 @@ describe('create command', () => {
     
     // Verify worktree created from base branch
     expect(mockGitOps.createWorktree).toHaveBeenCalledWith(
-      '.worktrees/wt-feature-test',
+      path.join('.worktrees', 'wt-feature-test'),
       'feature-test',
       'develop'
     );
@@ -149,7 +149,7 @@ describe('create command', () => {
 
   test('throws error when worktree already exists', async () => {
     mockGitOps.listWorktrees.mockResolvedValue([
-      { path: '.worktrees/wt-feature-test', branch: 'feature-test' }
+      { path: path.join('.worktrees', 'wt-feature-test'), branch: 'feature-test' }
     ]);
     
     try {
@@ -160,7 +160,7 @@ describe('create command', () => {
     
     expect(mockConsole.error).toHaveBeenCalledWith(
       chalk.red('Error:'),
-      'Worktree already exists at .worktrees/wt-feature-test'
+      `Worktree already exists at ${path.join('.worktrees', 'wt-feature-test')}`
     );
     expect(mockExit).toHaveBeenCalledWith(1);
   });
@@ -235,7 +235,7 @@ describe('create command', () => {
     
     // Should show cd command
     expect(mockConsole.log).toHaveBeenCalledWith(
-      chalk.gray('  cd .worktrees/wt-feature-test')
+      chalk.gray(`  cd ${path.join('.worktrees', 'wt-feature-test')}`)
     );
     
     // Should show dev server commands with ports
