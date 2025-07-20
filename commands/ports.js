@@ -16,16 +16,16 @@ async function portsCommand(worktreeName) {
       const ports = portManager.getPorts(worktreeName);
       
       if (!ports) {
-        console.log(chalk.yellow(`No ports assigned to worktree '${worktreeName}'`));
+        console.log(`No ports assigned to worktree '${worktreeName}'`);
         return;
       }
       
-      console.log(chalk.blue(`\nPorts for worktree '${worktreeName}':`));
+      console.log(`\nPorts for worktree '${worktreeName}':`);
       
       for (const [service, port] of Object.entries(ports)) {
         const isInUse = await portManager.isPortInUse(port);
-        const status = isInUse ? chalk.green(' (in use)') : chalk.gray(' (available)');
-        console.log(chalk.gray(`  ${service}: ${port}${status}`));
+        const status = isInUse ? ' (in use)' : ' (available)';
+        console.log(`  ${service}: ${port}${status}`);
       }
       
       const conflicts = [];
@@ -39,9 +39,9 @@ async function portsCommand(worktreeName) {
       }
       
       if (conflicts.length > 0) {
-        console.log('\n' + chalk.red('⚠ Port conflicts detected:'));
+        console.log('\n⚠ Port conflicts detected:');
         for (const { service, port } of conflicts) {
-          console.log(chalk.red(`  ${service} port ${port} is in use by another process`));
+          console.log(`  ${service} port ${port} is in use by another process`);
         }
         
         const { reassign } = await inquirer.prompt([{
@@ -58,7 +58,7 @@ async function portsCommand(worktreeName) {
             const newPort = portManager.findAvailablePort(range, allPorts);
             ports[service] = newPort;
             allPorts.push(newPort);
-            console.log(chalk.green(`✓ Reassigned ${service} to port ${newPort}`));
+            console.log(`✓ Reassigned ${service} to port ${newPort}`);
           }
           
           portManager.portMap[worktreeName] = {
@@ -73,29 +73,29 @@ async function portsCommand(worktreeName) {
       const allPorts = portManager.getAllPorts();
       
       if (Object.keys(allPorts).length === 0) {
-        console.log(chalk.yellow('No port assignments found'));
+        console.log('No port assignments found');
         return;
       }
       
-      console.log(chalk.blue('\nPort assignments for all worktrees:'));
-      console.log(chalk.gray('─'.repeat(50)));
+      console.log('\nPort assignments for all worktrees:');
+      console.log('─'.repeat(50));
       
       for (const [worktreeName, ports] of Object.entries(allPorts)) {
-        console.log('\n' + chalk.cyan(worktreeName));
+        console.log('\n' + worktreeName);
         
         for (const [service, port] of Object.entries(ports)) {
           const isInUse = await portManager.isPortInUse(port);
-          const status = isInUse ? chalk.green(' ✓') : '';
-          console.log(chalk.gray(`  ${service}: ${port}${status}`));
+          const status = isInUse ? ' ✓' : '';
+          console.log(`  ${service}: ${port}${status}`);
         }
       }
       
       const usedPorts = portManager.getAllUsedPorts();
-      console.log('\n' + chalk.gray(`Total ports in use: ${usedPorts.length}`));
+      console.log('\n' + `Total ports in use: ${usedPorts.length}`);
       
-      console.log('\n' + chalk.gray('Port ranges:'));
+      console.log('\n' + 'Port ranges:');
       for (const [service, range] of Object.entries(cfg.portRanges)) {
-        console.log(chalk.gray(`  ${service}: ${range.start}-${range.start + 100} (increment: ${range.increment})`));
+        console.log(`  ${service}: ${range.start}-${range.start + 100} (increment: ${range.increment})`);
       }
     }
     

@@ -87,17 +87,17 @@ async function removeCommand(worktreeName, options, prompter = new Prompter()) {
     console.log('\n' + chalk.blue('Removing worktree...'));
     
     await gitOps.removeWorktree(worktreePath, options.force);
-    console.log(chalk.green('✓ Removed worktree'));
+    console.log('✓ Removed worktree');
     
     const ports = portManager.getPorts(worktreeName);
     if (ports) {
       await portManager.releasePorts(worktreeName);
-      console.log(chalk.green(`✓ Released ports ${portManager.formatPortDisplay(ports)}`));
+      console.log(`✓ Released ports ${portManager.formatPortDisplay(ports)}`);
     }
     
     if (worktree.branch) {
-      console.log(chalk.gray(`\nNote: Branch '${worktree.branch}' still exists.`));
-      console.log(chalk.gray(`To delete it, run: git branch -d ${worktree.branch}`));
+      console.log(`\nNote: Branch '${worktree.branch}' still exists.`);
+      console.log(`To delete it, run: git branch -d ${worktree.branch}`);
     }
     
     return { success: true };

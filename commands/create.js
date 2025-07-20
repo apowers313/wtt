@@ -16,7 +16,6 @@ async function createCommand(branchName, options) {
     const worktreeName = config.getWorktreeName(branchName);
     const worktreePath = config.getWorktreePath(worktreeName);
     
-    console.log(chalk.blue(`Creating worktree '${worktreeName}'...`));
     
     const worktrees = await gitOps.listWorktrees();
     const existingWorktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
@@ -33,16 +32,16 @@ async function createCommand(branchName, options) {
     }
     
     await gitOps.createWorktree(worktreePath, branchName, baseBranch);
-    console.log(chalk.green(`✓ Worktree created at ${worktreePath}`));
+    console.log(`✓ Worktree created at ${worktreePath}`);
     
     await portManager.init(config.getBaseDir());
     
     const services = Object.keys(cfg.portRanges);
     const ports = await portManager.assignPorts(worktreeName, services, cfg.portRanges);
     
-    console.log(chalk.green('✓ Assigned ports:'));
+    console.log('✓ Assigned ports:');
     for (const [service, port] of Object.entries(ports)) {
-      console.log(chalk.gray(`  - ${service}: ${port}`));
+      console.log(`  - ${service}: ${port}`);
     }
     
     const envContent = Object.entries(ports)
@@ -52,7 +51,7 @@ async function createCommand(branchName, options) {
     
     const envPath = path.join(worktreePath, '.env.worktree');
     await fs.writeFile(envPath, envContent);
-    console.log(chalk.green('✓ Created .env.worktree'));
+    console.log('✓ Created .env.worktree');
     
     // Ensure .env.worktree is ignored by git to prevent merge conflicts
     const gitignorePath = path.join(worktreePath, '.gitignore');
@@ -68,24 +67,25 @@ async function createCommand(branchName, options) {
         gitignoreContent += (gitignoreContent.endsWith('\n') || gitignoreContent.endsWith('\r\n')) ? '' : os.EOL;
         gitignoreContent += '.env.worktree' + os.EOL;
         await fs.writeFile(gitignorePath, gitignoreContent);
-        console.log(chalk.green('✓ Added .env.worktree to .gitignore'));
+        console.log('✓ Added .env.worktree to .gitignore');
       }
     } catch (error) {
-      console.log(chalk.yellow(`⚠ Could not update .gitignore: ${error.message}`));
+      console.log(`⚠ Could not update .gitignore: ${error.message}`);
     }
     
-    console.log('\n' + chalk.cyan('To start working:'));
-    console.log(chalk.gray(`  cd ${worktreePath}`));
+    
+    console.log('\n' + 'To start working:');
+    console.log(`  cd ${worktreePath}`);
     
     const packageJsonPath = path.join(worktreePath, 'package.json');
     try {
       await fs.access(packageJsonPath);
       const services = Object.keys(ports);
       if (services.includes('vite')) {
-        console.log(chalk.gray(`  npm run dev        # Runs on port ${ports.vite}`));
+        console.log(`  npm run dev        # Runs on port ${ports.vite}`);
       }
       if (services.includes('storybook')) {
-        console.log(chalk.gray(`  npm run storybook  # Runs on port ${ports.storybook}`));
+        console.log(`  npm run storybook  # Runs on port ${ports.storybook}`);
       }
     } catch {
     }

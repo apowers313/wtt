@@ -28,17 +28,10 @@ async function removeCommand(worktreeName, options) {
       throw new Error(`Worktree '${worktreeName}' not found`);
     }
     
-    console.log(chalk.blue(`Checking worktree '${worktreeName}'...`));
     
     if (!options.force && worktree) {
       const hasUncommitted = await gitOps.hasUncommittedChanges(worktreePath);
       if (hasUncommitted) {
-        console.log(chalk.red('✗ Worktree has uncommitted changes'));
-        
-        const info = await gitOps.getWorktreeInfo(worktreePath);
-        if (info.modified > 0) {
-          console.log(chalk.yellow(`  ${info.modified} modified files`));
-        }
         
         let confirmRemove = false;
         
@@ -56,8 +49,7 @@ async function removeCommand(worktreeName, options) {
         }
         
         if (!confirmRemove) {
-          console.log(chalk.yellow('Aborted'));
-          return;
+            return;
         }
         
         options.force = true;
@@ -65,7 +57,6 @@ async function removeCommand(worktreeName, options) {
       
       const hasUnpushed = worktree ? await gitOps.hasUnpushedCommits(worktreePath) : false;
       if (hasUnpushed) {
-        console.log(chalk.yellow('⚠ Branch has unpushed commits'));
         
         let confirmRemove = false;
         
@@ -83,20 +74,12 @@ async function removeCommand(worktreeName, options) {
         }
         
         if (!confirmRemove) {
-          console.log(chalk.yellow('Aborted'));
-          return;
+            return;
         }
       }
     }
     
     if (!options.force) {
-      console.log('\n' + chalk.yellow('This will remove:'));
-      console.log(chalk.gray(`  - Worktree at ${worktreePath}`));
-      
-      const ports = portManager.getPorts(worktreeName);
-      if (ports) {
-        console.log(chalk.gray(`  - Port assignments: ${portManager.formatPortDisplay(ports)}`));
-      }
       
       let confirmFinal = true;
       
@@ -112,22 +95,20 @@ async function removeCommand(worktreeName, options) {
       }
       
       if (!confirmFinal) {
-        console.log(chalk.yellow('Aborted'));
         return;
       }
     }
     
-    console.log('\n' + chalk.blue('Removing worktree...'));
     
     // Only remove git worktree if it actually exists
     if (worktree) {
       await gitOps.removeWorktree(worktreePath, options.force);
-      console.log(chalk.green('✓ Removed worktree'));
+      console.log('✓ Removed worktree');
     } else {
       // Clean up any remaining directory if it exists
       try {
         await fs.rm(worktreePath, { recursive: true });
-        console.log(chalk.green('✓ Cleaned up worktree directory'));
+        console.log('✓ Cleaned up worktree directory');
       } catch (error) {
         // Directory might not exist, that's fine
       }
@@ -136,12 +117,12 @@ async function removeCommand(worktreeName, options) {
     const assignedPorts = portManager.getPorts(worktreeName);
     if (assignedPorts) {
       await portManager.releasePorts(worktreeName);
-      console.log(chalk.green(`✓ Released ports ${portManager.formatPortDisplay(assignedPorts)}`));
+      console.log(`✓ Released ports ${portManager.formatPortDisplay(assignedPorts)}`);
     }
     
     if (worktree && worktree.branch) {
-      console.log(chalk.gray(`\nNote: Branch '${worktree.branch}' still exists.`));
-      console.log(chalk.gray(`To delete it, run: git branch -d ${worktree.branch}`));
+      console.log(`\nNote: Branch '${worktree.branch}' still exists.`);
+      console.log(`To delete it, run: git branch -d ${worktree.branch}`);
     }
     
   } catch (error) {

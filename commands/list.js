@@ -24,13 +24,13 @@ async function listCommand(options) {
     });
     
     if (managedWorktrees.length === 0) {
-      console.log(chalk.yellow('No worktrees found.'));
+      console.log('No worktrees found.');
       return;
     }
     
     if (options.verbose) {
-      console.log(chalk.bold('\nWORKTREE           BRANCH         PORTS              STATUS'));
-      console.log(chalk.gray('─'.repeat(70)));
+      console.log('\nWORKTREE           BRANCH         PORTS              STATUS');
+      console.log('─'.repeat(70));
       
       for (const worktree of managedWorktrees) {
         const worktreeName = path.basename(worktree.path);
@@ -44,7 +44,7 @@ async function listCommand(options) {
           info = { branch: worktree.branch || 'unknown', error: true };
         }
         
-        console.log(chalk.cyan(worktreeName.padEnd(18)) + ' ' + 
+        console.log(worktreeName.padEnd(18) + ' ' + 
                    (info.branch || 'unknown').padEnd(14));
         
         if (ports) {
@@ -55,7 +55,7 @@ async function listCommand(options) {
             console.log(' '.repeat(33) + portStr.padEnd(18) + status);
           }
         } else {
-          console.log(' '.repeat(33) + chalk.gray('No ports assigned'));
+          console.log(' '.repeat(33) + 'No ports assigned');
         }
         
         if (!info.error) {
@@ -88,17 +88,15 @@ async function listCommand(options) {
         console.log();
       }
     } else {
-      console.log(chalk.bold('\nWorktrees:'));
+      console.log('\nWorktrees:');
       for (const worktree of managedWorktrees) {
         const worktreeName = path.basename(worktree.path);
         const ports = portManager.getPorts(worktreeName);
         const portDisplay = ports ? portManager.formatPortDisplay(ports) : 'No ports';
         
-        console.log(chalk.cyan(`  ${worktreeName}`) + 
-                   chalk.gray(` (${worktree.branch || 'unknown'})`) +
-                   chalk.gray(` - ${portDisplay}`));
+        console.log(`  ${worktreeName} (${worktree.branch || 'unknown'}) - ${portDisplay}`);
       }
-      console.log('\n' + chalk.gray('Use --verbose for detailed information'));
+      console.log('\nUse --verbose for detailed information');
     }
     
   } catch (error) {
