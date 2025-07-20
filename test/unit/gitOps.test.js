@@ -233,12 +233,9 @@ describe('GitOps module (integration)', () => {
     repo = new TestRepository();
     await repo.init();
     
-    // Debug logging for CI setup
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('\n[DEBUG] GitOps test setup:');
-      console.log('  Repo directory:', repo.dir);
-      console.log('  Platform:', process.platform);
-      console.log('  Current working dir before chdir:', process.cwd());
+    // Minimal logging for CI setup
+    if (process.env.DEBUG_GITOPS_SETUP) {
+      console.log('\n[DEBUG] GitOps test setup:', repo.dir);
     }
     
     // Ensure we're on the main branch (repo.init() already creates it)
@@ -251,9 +248,7 @@ describe('GitOps module (integration)', () => {
     
     process.chdir(repo.dir);
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('  Current working dir after chdir:', process.cwd());
-    }
+    // Removed verbose logging
     
     // Reinitialize gitOps with the test directory
     const simpleGit = require('simple-git');
@@ -422,39 +417,6 @@ describe('GitOps module (integration)', () => {
         throw error;
       }
       
-      // Enhanced debugging for CI
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log('\n[DEBUG] listWorktrees test:');
-        console.log('  Platform:', process.platform);
-        console.log('  Main repo dir:', repo.dir);
-        console.log('  Found worktrees count:', worktrees.length);
-        console.log('  Working directory:', process.cwd());
-        
-        worktrees.forEach((wt, index) => {
-          console.log(`  Worktree ${index}:`);
-          console.log(`    Path: ${wt.path}`);
-          console.log(`    Branch: ${wt.branch}`);
-          console.log(`    Bare: ${wt.bare || false}`);
-          console.log(`    Detached: ${wt.detached || false}`);
-          console.log(`    Has .worktrees in path: ${wt.path.includes('.worktrees')}`);
-          console.log(`    Is main repo candidate: ${!wt.path.includes('.worktrees') && !wt.bare}`);
-          
-          if (process.platform === 'win32') {
-            console.log(`    Normalized path: ${wt.path.replace(/\\/g, '/').toLowerCase()}`);
-            console.log(`    Path ends with: ${path.basename(wt.path)}`);
-          }
-        });
-        
-        if (process.platform === 'win32') {
-          console.log('  Main repo normalized:', repo.dir.replace(/\\/g, '/').toLowerCase());
-          console.log('  Path comparison results:');
-          worktrees.forEach((wt, index) => {
-            const match = pathsEqual(wt.path, repo.dir);
-            console.log(`    Worktree ${index} matches main: ${match}`);
-          });
-        }
-      }
-      
       // Should at least have the main worktree
       expect(worktrees.length).toBeGreaterThanOrEqual(1);
       
@@ -466,14 +428,25 @@ describe('GitOps module (integration)', () => {
         return !wt.path.includes('.worktrees') && !wt.bare;
       });
       
-      // If no main repo found but we have worktrees, it might be a git state issue
-      // This can happen on Windows CI when git is in an unusual state
-      if (!mainRepoFound && worktrees.length > 0) {
-        console.warn('[DEBUG] No main repo found in worktrees, but worktrees exist. Git might be in unusual state.');
-        // Skip this assertion on Windows CI if git is in a weird state
-        if (process.platform === 'win32' && process.env.CI) {
-          console.warn('[DEBUG] Skipping main repo assertion on Windows CI due to potential git state issues');
-          return;
+      // Only debug if the test is failing
+      if (!mainRepoFound) {
+        console.log('\n[DEBUG] listWorktrees test failing - no main repo found:');
+        console.log('  Platform:', process.platform);
+        console.log('  Found worktrees count:', worktrees.length);
+        
+        worktrees.forEach((wt, index) => {
+          console.log(`  Worktree ${index}: ${wt.path} [${wt.branch}] (bare: ${wt.bare}, has .worktrees: ${wt.path.includes('.worktrees')})`);
+        });
+        
+        // If no main repo found but we have worktrees, it might be a git state issue
+        // This can happen on Windows CI when git is in an unusual state
+        if (worktrees.length > 0) {
+          console.log('[DEBUG] Git might be in unusual state.');
+          // Skip this assertion on Windows CI if git is in a weird state
+          if (process.platform === 'win32' && process.env.CI) {
+            console.log('[DEBUG] Skipping main repo assertion on Windows CI due to potential git state issues');
+            return;
+          }
         }
       }
       

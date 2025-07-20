@@ -49,23 +49,18 @@ class TestRepository {
     // Quote the tool path to handle spaces in Windows paths
     const fullCommand = `node "${this.toolPath}" ${command.replace('wt ', '')}`;
     
-    // Debug logging for CI
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('\n[DEBUG] Running wt command:');
-      console.log('  Full command:', fullCommand);
-      console.log('  Working directory:', this.dir);
-      console.log('  Tool path:', this.toolPath);
+    // Only log failing commands on CI to reduce noise
+    if (process.env.DEBUG_WT_COMMANDS) {
+      console.log('\n[DEBUG] Running wt command:', fullCommand);
     }
     
     return await this.exec(fullCommand);
   }
   
   async git(command) {
-    // Debug logging for git commands in CI
-    if ((process.env.CI || process.env.DEBUG_TESTS) && process.env.DEBUG_GIT) {
-      console.log('\n[DEBUG] Running git command:');
-      console.log('  Command:', `git ${command}`);
-      console.log('  Working directory:', this.dir);
+    // Only log git commands if specifically requested
+    if (process.env.DEBUG_GIT_COMMANDS) {
+      console.log('\n[DEBUG] Running git command:', `git ${command}`);
     }
     
     return await this.exec(`git ${command}`);
@@ -83,31 +78,16 @@ class TestRepository {
         stderr: stderr.trim() 
       };
       
-      // Enhanced debug logging for CI
-      if (process.env.CI || process.env.DEBUG_TESTS) {
+      // Only log command details if specifically requested or on failure
+      if (process.env.DEBUG_ALL_COMMANDS) {
         const duration = Date.now() - startTime;
         console.log('\n[DEBUG] Command execution:');
         console.log('  Command:', command);
-        console.log('  Working dir:', this.dir);
         console.log('  Exit code:', result.exitCode);
         console.log('  Duration:', `${duration}ms`);
-        console.log('  Platform:', process.platform);
         
         if (stdout.trim()) {
-          console.log('  STDOUT:');
-          stdout.trim().split('\n').forEach(line => console.log('    >', line));
-        }
-        
-        if (stderr.trim()) {
-          console.log('  STDERR:');
-          stderr.trim().split('\n').forEach(line => console.log('    !', line));
-        }
-        
-        // Special debugging for git worktree commands on Windows
-        if (process.platform === 'win32' && command.includes('git worktree')) {
-          console.log('  [WINDOWS] Git worktree command detected');
-          console.log('  [WINDOWS] Raw stdout length:', stdout.length);
-          console.log('  [WINDOWS] Raw stdout:', JSON.stringify(stdout));
+          console.log('  STDOUT:', stdout.trim().split('\n').slice(0, 3).join('; ') + (stdout.trim().split('\n').length > 3 ? '...' : ''));
         }
       }
       
@@ -121,36 +101,12 @@ class TestRepository {
         stderr: error.stderr?.trim() || error.message 
       };
       
-      // Enhanced error debugging for CI
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log('\n[DEBUG] Command failed:');
-        console.log('  Command:', command);
-        console.log('  Working dir:', this.dir);
-        console.log('  Exit code:', result.exitCode);
-        console.log('  Duration:', `${duration}ms`);
-        console.log('  Platform:', process.platform);
-        console.log('  Error message:', error.message);
-        
-        if (error.stdout) {
-          console.log('  STDOUT:');
-          error.stdout.trim().split('\n').forEach(line => console.log('    >', line));
-        }
-        
-        if (error.stderr) {
-          console.log('  STDERR:');
-          error.stderr.trim().split('\n').forEach(line => console.log('    !', line));
-        }
-        
-        // Log the full error object in CI for more details
-        if (process.env.CI) {
-          console.log('  Full error object:', JSON.stringify({
-            message: error.message,
-            code: error.code,
-            killed: error.killed,
-            signal: error.signal,
-            cmd: error.cmd
-          }, null, 2));
-        }
+      // Always log command failures - these are important for debugging
+      console.error('\n[ERROR] Command failed:', command);
+      console.error('  Exit code:', result.exitCode);
+      console.error('  Error:', error.message);
+      if (result.stderr) {
+        console.error('  STDERR:', result.stderr);
       }
       
       return result;
