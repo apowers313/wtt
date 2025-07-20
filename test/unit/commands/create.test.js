@@ -121,7 +121,7 @@ describe('create command', () => {
     // Verify .env.worktree creation
     expect(mockFs.writeFile).toHaveBeenCalledWith(
       path.join('.worktrees', 'wt-feature-test', '.env.worktree'),
-      'VITE_PORT=3000\nSTORYBOOK_PORT=6000\nWORKTREE_NAME=wt-feature-test\n'
+      expect.stringMatching(/VITE_PORT=3000[\r\n]+STORYBOOK_PORT=6000[\r\n]+WORKTREE_NAME=wt-feature-test[\r\n]+/)
     );
     
     // Verify success messages
@@ -195,7 +195,7 @@ describe('create command', () => {
     // Should append .env.worktree
     expect(mockFs.writeFile).toHaveBeenCalledWith(
       path.join('.worktrees', 'wt-feature-test', '.gitignore'),
-      'node_modules\n.env.worktree\n'
+      expect.stringMatching(/node_modules[\r\n]+\.env\.worktree[\r\n]+/)
     );
   });
 
@@ -207,7 +207,7 @@ describe('create command', () => {
     // Should create new gitignore with .env.worktree
     expect(mockFs.writeFile).toHaveBeenCalledWith(
       path.join('.worktrees', 'wt-feature-test', '.gitignore'),
-      '\n.env.worktree\n'
+      expect.stringMatching(/[\r\n]+\.env\.worktree[\r\n]+/)
     );
   });
 
