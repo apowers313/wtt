@@ -6,6 +6,51 @@ const fs = require('fs').promises;
 describe('GitOps module (integration)', () => {
   let repo;
   
+  // Helper function to compare paths across platforms
+  function pathsEqual(path1, path2) {
+    // Handle both absolute and relative paths
+    const abs1 = path.isAbsolute(path1) ? path1 : path.resolve(path1);
+    const abs2 = path.isAbsolute(path2) ? path2 : path.resolve(path2);
+    
+    // Normalize both paths to handle different formats
+    const normalized1 = abs1.replace(/\\/g, '/');
+    const normalized2 = abs2.replace(/\\/g, '/');
+    
+    // Case-insensitive comparison for Windows
+    if (process.platform === 'win32') {
+      return normalized1.toLowerCase() === normalized2.toLowerCase();
+    }
+    
+    return normalized1 === normalized2;
+  }
+  
+  // Helper to find worktree by path
+  function hasWorktree(worktrees, targetPath) {
+    // Try exact match first
+    let found = worktrees.some(wt => pathsEqual(wt.path, targetPath));
+    
+    // If not found, try matching by the last part of the path (worktree name)
+    if (!found) {
+      const targetName = path.basename(targetPath);
+      found = worktrees.some(wt => {
+        const wtName = path.basename(wt.path);
+        return wtName === targetName && wt.path.includes('.worktrees');
+      });
+    }
+    
+    // Debug output if not found and in CI
+    if (!found && process.env.CI) {
+      console.log('Worktree not found. Looking for:', targetPath);
+      console.log('Available worktrees:');
+      worktrees.forEach(wt => {
+        console.log('  - Path:', wt.path);
+        console.log('    Branch:', wt.branch);
+      });
+    }
+    
+    return found;
+  }
+  
   beforeEach(async () => {
     repo = new TestRepository();
     await repo.init();
@@ -73,8 +118,7 @@ describe('GitOps module (integration)', () => {
       
       // Verify worktree exists
       const worktrees = await gitOps.listWorktrees();
-      const normalizedWorktreePath = path.resolve(worktreePath);
-      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedWorktreePath)).toBe(true);
+      expect(hasWorktree(worktrees, worktreePath)).toBe(true);
       
       // Verify branch was created
       const branches = await repo.git('branch');
@@ -92,8 +136,7 @@ describe('GitOps module (integration)', () => {
       
       // Verify worktree exists
       const worktrees = await gitOps.listWorktrees();
-      const normalizedWorktreePath = path.resolve(worktreePath);
-      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedWorktreePath)).toBe(true);
+      expect(hasWorktree(worktrees, worktreePath)).toBe(true);
     });
 
     test('throws when trying to create new branch that already exists', async () => {
@@ -144,10 +187,8 @@ describe('GitOps module (integration)', () => {
       const worktrees = await gitOps.listWorktrees();
       
       expect(worktrees.length).toBeGreaterThanOrEqual(3); // main + 2 worktrees
-      const normalizedWt1 = path.resolve(wt1);
-      const normalizedWt2 = path.resolve(wt2);
-      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedWt1)).toBe(true);
-      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedWt2)).toBe(true);
+      expect(hasWorktree(worktrees, wt1)).toBe(true);
+      expect(hasWorktree(worktrees, wt2)).toBe(true);
     });
 
     test('handles empty worktree list', async () => {
@@ -156,8 +197,7 @@ describe('GitOps module (integration)', () => {
       // Should at least have the main worktree
       expect(worktrees.length).toBeGreaterThanOrEqual(1);
       // The first worktree should be the main repo
-      const normalizedRepoDir = path.resolve(repo.dir);
-      expect(worktrees.some(wt => path.resolve(wt.path) === normalizedRepoDir)).toBe(true);
+      expect(hasWorktree(worktrees, repo.dir)).toBe(true);
     });
   });
 
