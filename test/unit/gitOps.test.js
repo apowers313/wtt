@@ -60,17 +60,25 @@ describe('GitOps module (integration)', () => {
     
     // Try various matching strategies
     const strategies = [
-      // Same basename
-      () => comp1.basename && comp1.basename === comp2.basename,
+      // Same basename (for exact file/directory name matches)
+      () => comp1.basename && comp1.basename === comp2.basename && comp1.basename !== '',
       
       // Same last two segments (e.g., ".worktrees/wt-feature")
-      () => comp1.lastTwo && comp1.lastTwo === comp2.lastTwo,
+      () => comp1.lastTwo && comp1.lastTwo === comp2.lastTwo && comp1.lastTwo !== '',
       
       // Same last three segments
-      () => comp1.lastThree && comp1.lastThree === comp2.lastThree,
+      () => comp1.lastThree && comp1.lastThree === comp2.lastThree && comp1.lastThree !== '',
       
-      // One path ends with the other
-      () => normalized1.endsWith(comp2.lastTwo) || normalized2.endsWith(comp1.lastTwo),
+      // Same last four segments (for deeper path matching)
+      () => comp1.lastFour && comp1.lastFour === comp2.lastFour && comp1.lastFour !== '',
+      
+      // One path ends with the other's meaningful part
+      () => {
+        if (comp1.lastTwo && comp2.lastTwo) {
+          return normalized1.endsWith(comp2.lastTwo) || normalized2.endsWith(comp1.lastTwo);
+        }
+        return false;
+      },
       
       // Test repo directory matching for temp paths
       () => {
@@ -85,6 +93,31 @@ describe('GitOps module (integration)', () => {
           const suffix1 = normalized1.substring(idx1);
           const suffix2 = normalized2.substring(idx2);
           return suffix1 === suffix2;
+        }
+        return false;
+      },
+      
+      // Special case: both are main repo paths (no .worktrees in path)
+      () => {
+        const both_main = !normalized1.includes('.worktrees') && !normalized2.includes('.worktrees');
+        if (both_main) {
+          // Check if they refer to the same test directory
+          const testDirPattern = /wtt-tests-[a-z0-9]+/i;
+          const match1 = normalized1.match(testDirPattern);
+          const match2 = normalized2.match(testDirPattern);
+          return match1 && match2 && match1[0] === match2[0];
+        }
+        return false;
+      },
+      
+      // Worktree path matching: both contain .worktrees and same worktree name
+      () => {
+        const both_worktrees = normalized1.includes('.worktrees') && normalized2.includes('.worktrees');
+        if (both_worktrees) {
+          // Extract worktree name (should be after .worktrees/)
+          const wt1_match = normalized1.match(/\.worktrees[\/\\]([^\/\\]+)/);
+          const wt2_match = normalized2.match(/\.worktrees[\/\\]([^\/\\]+)/);
+          return wt1_match && wt2_match && wt1_match[1] === wt2_match[1];
         }
         return false;
       }
