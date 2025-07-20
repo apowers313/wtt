@@ -2,6 +2,7 @@ const { TestRepository } = require('../helpers/TestRepository');
 const gitOps = require('../../lib/gitOps');
 const path = require('path');
 const fs = require('fs').promises;
+const PathUtils = require('../../lib/pathUtils');
 
 describe('GitOps module (integration)', () => {
   let repo;
@@ -373,7 +374,7 @@ describe('GitOps module (integration)', () => {
       await gitOps.removeWorktree(worktreePath);
       
       const worktrees = await gitOps.listWorktrees();
-      expect(worktrees.some(wt => wt.path === worktreePath)).toBe(false);
+      expect(worktrees.some(wt => PathUtils.equals(wt.path, worktreePath))).toBe(false);
     });
 
     test('force removes worktree with uncommitted changes', async () => {
@@ -388,7 +389,7 @@ describe('GitOps module (integration)', () => {
       await gitOps.removeWorktree(worktreePath, true);
       
       const worktrees = await gitOps.listWorktrees();
-      expect(worktrees.some(wt => wt.path === worktreePath)).toBe(false);
+      expect(worktrees.some(wt => PathUtils.equals(wt.path, worktreePath))).toBe(false);
     });
   });
 

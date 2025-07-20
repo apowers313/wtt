@@ -3,6 +3,7 @@ const path = require('path');
 const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
+const PathUtils = require('../lib/pathUtils');
 
 async function listCommand(options) {
   try {
@@ -14,11 +15,12 @@ async function listCommand(options) {
     
     const worktrees = await gitOps.listWorktrees();
     const managedWorktrees = worktrees.filter(wt => {
-      // Normalize paths for cross-platform comparison
-      const normalizedPath = path.normalize(wt.path);
-      const normalizedBaseDir = path.normalize(cfg.baseDir);
+      // Normalize paths for cross-platform comparison using PathUtils
+      const normalizedPath = PathUtils.normalize(wt.path);
+      const normalizedBaseDir = PathUtils.normalize(cfg.baseDir);
+      const normalizedCwd = PathUtils.normalize(process.cwd());
       return normalizedPath.includes(normalizedBaseDir) && 
-        !normalizedPath.endsWith(path.normalize(process.cwd()));
+        !normalizedPath.endsWith(normalizedCwd);
     });
     
     if (managedWorktrees.length === 0) {
