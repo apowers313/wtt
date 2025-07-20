@@ -20,7 +20,7 @@ describe('wt remove command (simplified)', () => {
     const result = await repo.run('remove wt-feature-test --force');
     
     helpers.expectSuccess(result);
-    helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree']);
+    helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree', 'Cleaned up worktree directory']);
     
     // Verify worktree is removed
     await AsyncTestHelpers.retry(async () => {
@@ -45,7 +45,7 @@ describe('wt remove command (simplified)', () => {
     const result = await repo.run('remove wt-feature-test --force');
     
     helpers.expectSuccess(result);
-    helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree']);
+    helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree', 'Cleaned up worktree directory']);
     
     // Verify worktree is removed
     await AsyncTestHelpers.retry(async () => {

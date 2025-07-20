@@ -30,7 +30,7 @@ describe('wt remove command (fixed)', () => {
     const result = await repo.run('remove wt-feature-test --force');
     
     helpers.expectSuccess(result);
-    helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree']);
+    helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree', 'Cleaned up worktree directory']);
     
     // Verify worktree is removed
     await AsyncTestHelpers.retry(async () => {
@@ -60,7 +60,7 @@ describe('wt remove command (fixed)', () => {
     const result = await repo.run('remove wt-feature-test --force');
     
     helpers.expectSuccess(result);
-    helpers.expectOutputContains(result, ['removed', 'Removed']);
+    helpers.expectOutputContains(result, ['removed', 'Removed', 'Cleaned up']);
     
     // Verify cleanup
     const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
