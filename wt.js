@@ -27,8 +27,13 @@ program
   .description('Initialize worktree configuration for the repository')
   .action(async () => {
     try {
+      const configExists = await config.exists();
       await config.init();
-      console.log(chalk.green('✓ Initialized worktree configuration'));
+      if (configExists) {
+        console.log(chalk.yellow('✓ Configuration already exists'));
+      } else {
+        console.log(chalk.green('✓ Initialized worktree configuration'));
+      }
     } catch (error) {
       console.error(chalk.red('Error initializing configuration:'), error.message);
       process.exit(1);

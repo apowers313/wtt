@@ -101,12 +101,15 @@ class TestRepository {
         stderr: error.stderr?.trim() || error.message 
       };
       
-      // Always log command failures - these are important for debugging
-      console.error('\n[ERROR] Command failed:', command);
-      console.error('  Exit code:', result.exitCode);
-      console.error('  Error:', error.message);
-      if (result.stderr) {
-        console.error('  STDERR:', result.stderr);
+      // Only log command failures when DEBUG_TESTS is enabled or in CI
+      const shouldLog = process.env.DEBUG_TESTS === 'true' || process.env.CI;
+      if (shouldLog) {
+        console.error('\n[ERROR] Command failed:', command);
+        console.error('  Exit code:', result.exitCode);
+        console.error('  Error:', error.message);
+        if (result.stderr) {
+          console.error('  STDERR:', result.stderr);
+        }
       }
       
       return result;
