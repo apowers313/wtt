@@ -1,6 +1,7 @@
 const chalk = require('chalk');
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
 const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
@@ -46,7 +47,7 @@ async function createCommand(branchName, options) {
     const envContent = Object.entries(ports)
       .map(([service, port]) => `${service.toUpperCase()}_PORT=${port}`)
       .concat([`WORKTREE_NAME=${worktreeName}`])
-      .join('\n') + '\n';
+      .join(os.EOL) + os.EOL;
     
     const envPath = path.join(worktreePath, '.env.worktree');
     await fs.writeFile(envPath, envContent);
@@ -63,8 +64,8 @@ async function createCommand(branchName, options) {
       }
       
       if (!gitignoreContent.includes('.env.worktree')) {
-        gitignoreContent += gitignoreContent.endsWith('\n') ? '' : '\n';
-        gitignoreContent += '.env.worktree\n';
+        gitignoreContent += (gitignoreContent.endsWith('\n') || gitignoreContent.endsWith('\r\n')) ? '' : os.EOL;
+        gitignoreContent += '.env.worktree' + os.EOL;
         await fs.writeFile(gitignorePath, gitignoreContent);
         console.log(chalk.green('✓ Added .env.worktree to .gitignore'));
       }

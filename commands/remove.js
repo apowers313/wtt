@@ -125,7 +125,7 @@ async function removeCommand(worktreeName, options) {
     } else {
       // Clean up any remaining directory if it exists
       try {
-        await fs.rmdir(worktreePath, { recursive: true });
+        await fs.rm(worktreePath, { recursive: true });
         console.log(chalk.green('✓ Cleaned up worktree directory'));
       } catch (error) {
         // Directory might not exist, that's fine

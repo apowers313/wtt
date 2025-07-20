@@ -116,7 +116,7 @@ describe('wt init command', () => {
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr.toLowerCase()).toMatch(/not.*git|repository/i);
     } finally {
-      await fs.rmdir(nonGitDir, { recursive: true });
+      await fs.rm(nonGitDir, { recursive: true });
     }
   });
 });
