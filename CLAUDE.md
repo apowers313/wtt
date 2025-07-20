@@ -108,3 +108,7 @@ This ensures each worktree can have its own development context while maintainin
 - You may disable GPG signing for tests, but NEVER disable GPG signing for our actual code commits and NEVER EVER EVER git commit code or git add code on my behalf
 - NEVER commit on my behalf, always let me do the git commits manually
 - Do not git add files for me, I will do that myself
+
+## AI Interaction Guidelines
+
+- If I share a URL with you and you can't access it, stop and let me know
