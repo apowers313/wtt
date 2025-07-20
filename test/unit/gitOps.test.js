@@ -13,11 +13,25 @@ describe('GitOps module (integration)', () => {
     const abs2 = path.isAbsolute(path2) ? path2 : path.resolve(path2);
     
     // Normalize both paths to handle different formats
-    const normalized1 = abs1.replace(/\\/g, '/');
-    const normalized2 = abs2.replace(/\\/g, '/');
+    let normalized1 = abs1.replace(/\\/g, '/');
+    let normalized2 = abs2.replace(/\\/g, '/');
     
-    // Case-insensitive comparison for Windows
+    // On Windows, handle short path names (8.3 format)
     if (process.platform === 'win32') {
+      // Convert RUNNER~1 to runneradmin style comparisons
+      // Check if paths are the same except for the username part
+      const userPattern1 = /\/Users\/[^/]+\//i;
+      const userPattern2 = /\\Users\\[^\\]+\\/i;
+      
+      // Extract the part after the username
+      const afterUser1 = normalized1.replace(userPattern1, '/Users/USER/');
+      const afterUser2 = normalized2.replace(userPattern1, '/Users/USER/');
+      
+      if (afterUser1.toLowerCase() === afterUser2.toLowerCase()) {
+        return true;
+      }
+      
+      // Fall back to simple case-insensitive comparison
       return normalized1.toLowerCase() === normalized2.toLowerCase();
     }
     
@@ -38,8 +52,8 @@ describe('GitOps module (integration)', () => {
       });
     }
     
-    // Debug output if not found and in CI
-    if (!found && process.env.CI) {
+    // Debug output if not found and in CI (only for debugging new issues)
+    if (!found && process.env.CI && process.env.DEBUG_PATHS) {
       console.log('Worktree not found. Looking for:', targetPath);
       console.log('Available worktrees:');
       worktrees.forEach(wt => {
@@ -118,38 +132,7 @@ describe('GitOps module (integration)', () => {
       // Ensure the parent directory exists
       await fs.mkdir(path.dirname(worktreePath), { recursive: true });
       
-      try {
-        await gitOps.createWorktree(worktreePath, 'feature', 'main');
-        
-        // On Windows CI, verify the worktree was actually created
-        if (process.env.CI && process.platform === 'win32') {
-          const exists = await fs.access(worktreePath).then(() => true).catch(() => false);
-          console.log('Worktree directory exists after creation:', exists);
-          console.log('Worktree path:', worktreePath);
-          
-          // Try listing directory contents
-          try {
-            const parentDir = path.dirname(worktreePath);
-            const contents = await fs.readdir(parentDir);
-            console.log('Contents of', parentDir, ':', contents);
-          } catch (e) {
-            console.log('Could not read parent directory');
-          }
-        }
-      } catch (error) {
-        if (process.env.CI) {
-          console.log('Failed to create worktree:', error.message);
-          console.log('Worktree path:', worktreePath);
-          console.log('Current directory:', process.cwd());
-          
-          // Log the exact git command that would be run
-          const branches = await gitOps.git.branch();
-          const branchExists = branches.all.includes('feature');
-          console.log('Branch exists:', branchExists);
-          console.log('Git command would be: git worktree add', branchExists ? worktreePath + ' feature' : '-b feature ' + worktreePath + ' main');
-        }
-        throw error;
-      }
+      await gitOps.createWorktree(worktreePath, 'feature', 'main');
       
       // Verify worktree exists
       const worktrees = await gitOps.listWorktrees();
