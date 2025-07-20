@@ -10,7 +10,7 @@ describe('Simple integration test', () => {
     const wtPath = path.resolve(__dirname, '../../wt.js');
     
     try {
-      const { stdout, stderr } = await execAsync(`node ${wtPath} --help`);
+      const { stdout, stderr } = await execAsync(`node "${wtPath}" --help`);
       
       expect(stdout).toContain('Usage: wt [options] [command]');
       expect(stdout).toContain('init');
@@ -24,7 +24,7 @@ describe('Simple integration test', () => {
 
   test('wt tool can show version', async () => {
     const wtPath = path.resolve(__dirname, '../../wt.js');
-    const { stdout } = await execAsync(`node ${wtPath} --version`);
+    const { stdout } = await execAsync(`node "${wtPath}" --version`);
     
     expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
   });
@@ -48,7 +48,7 @@ describe('Simple integration test', () => {
       
       // Run wt init
       const wtPath = path.resolve(__dirname, '../../wt.js');
-      const { stdout } = await execAsync(`node ${wtPath} init`, { cwd: tempDir });
+      const { stdout } = await execAsync(`node "${wtPath}" init`, { cwd: tempDir });
       
       expect(stdout).toContain('Initialized');
       

@@ -46,7 +46,8 @@ class TestRepository {
   
   async run(command) {
     // Run wt command from original location but in test repository context
-    const fullCommand = `node ${this.toolPath} ${command.replace('wt ', '')}`;
+    // Quote the tool path to handle spaces in Windows paths
+    const fullCommand = `node "${this.toolPath}" ${command.replace('wt ', '')}`;
     return await this.exec(fullCommand);
   }
   
