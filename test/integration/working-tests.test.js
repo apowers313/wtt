@@ -30,10 +30,6 @@ describe('Git Worktree Tool - Working Tests', () => {
     // Create with --from to specify base branch
     const result = await repo.run('create test-feature --from main');
     
-    if (result.exitCode !== 0) {
-      console.log('Create failed:', result.stderr);
-      console.log('Stdout:', result.stdout);
-    }
     
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('Worktree created');

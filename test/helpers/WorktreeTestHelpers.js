@@ -43,37 +43,17 @@ class WorktreeTestHelpers {
     // First try with --from flag (seems to be required)
     const from = options.from || 'main';
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('\n[DEBUG] WorktreeTestHelpers.createWorktree:');
-      console.log('  Branch:', branch);
-      console.log('  From:', from);
-      console.log('  Platform:', process.platform);
-      console.log('  Working dir:', this.repo.dir);
-    }
     
     result = await this.repo.run(`create ${branch} --from ${from}`);
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('  Create result - Exit code:', result.exitCode);
-      console.log('  Create result - STDOUT:', result.stdout);
-      console.log('  Create result - STDERR:', result.stderr);
-    }
     
     if (result.exitCode !== 0 && result.stderr.includes('invalid reference')) {
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log('  Trying fallback: creating branch first');
-      }
       
       // Branch might not exist, try creating it first
       await this.repo.git(`checkout -b ${branch} ${from}`);
       await this.repo.git(`checkout ${from}`);
       result = await this.repo.run(`create ${branch}`);
       
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log('  Fallback result - Exit code:', result.exitCode);
-        console.log('  Fallback result - STDOUT:', result.stdout);
-        console.log('  Fallback result - STDERR:', result.stderr);
-      }
     }
     
     return result;
@@ -260,22 +240,11 @@ class WorktreeTestHelpers {
     const name = branch.startsWith('wt-') ? branch : `wt-${branch}`;
     const worktreePath = path.join('.worktrees', name);
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('\n[DEBUG] expectWorktreeExists:');
-      console.log('  Branch:', branch);
-      console.log('  Name:', name);
-      console.log('  Worktree path:', worktreePath);
-      console.log('  Should exist:', shouldExist);
-      console.log('  Platform:', process.platform);
-    }
     
     // Retry a few times to handle timing issues
     for (let i = 0; i < 3; i++) {
       const exists = await this.repo.exists(worktreePath);
       
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log(`  Attempt ${i + 1}: exists = ${exists}`);
-      }
       
       if (exists === shouldExist) {
         return true;
@@ -318,14 +287,6 @@ class WorktreeTestHelpers {
     const name = branch.startsWith('wt-') ? branch : `wt-${branch}`;
     const portMapPath = path.join('.worktrees', '.port-map.json');
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('\n[DEBUG] expectPortsAssigned:');
-      console.log('  Branch:', branch);
-      console.log('  Name:', name);
-      console.log('  Services:', services);
-      console.log('  Port map path:', portMapPath);
-      console.log('  Platform:', process.platform);
-    }
     
     // Try to read port map with retries
     let portMap;
@@ -334,32 +295,19 @@ class WorktreeTestHelpers {
         const portMapContent = await this.repo.readFile(portMapPath);
         portMap = JSON.parse(portMapContent);
         
-        if (process.env.CI || process.env.DEBUG_TESTS) {
-          console.log(`  Attempt ${i + 1}: Successfully read port map`);
-          console.log('  Port map content:', JSON.stringify(portMap, null, 2));
-        }
         break;
       } catch (error) {
-        if (process.env.CI || process.env.DEBUG_TESTS) {
-          console.log(`  Attempt ${i + 1}: Failed to read port map - ${error.message}`);
-        }
         if (i === 2) throw error;
         await this.sleep(100);
       }
     }
     
     if (!portMap[name]) {
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log('  Available worktrees in port map:', Object.keys(portMap));
-      }
       throw new Error(`No ports assigned for worktree ${name}`);
     }
     
     for (const service of services) {
       if (!portMap[name][service]) {
-        if (process.env.CI || process.env.DEBUG_TESTS) {
-          console.log(`  Available services for ${name}:`, Object.keys(portMap[name]));
-        }
         throw new Error(`Service ${service} not assigned for worktree ${name}`);
       }
     }

@@ -21,19 +21,9 @@ describe('GitOps module (integration)', () => {
     let normalized1 = normalize(path1);
     let normalized2 = normalize(path2);
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('\n[DEBUG] pathsEqual comparison:');
-      console.log('  Path1:', path1);
-      console.log('  Path2:', path2);
-      console.log('  Normalized1:', normalized1);
-      console.log('  Normalized2:', normalized2);
-    }
     
     // Direct comparison first
     if (normalized1 === normalized2) {
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log('  Result: MATCH (direct)');
-      }
       return true;
     }
     
@@ -54,10 +44,6 @@ describe('GitOps module (integration)', () => {
     const comp1 = getPathComponents(normalized1);
     const comp2 = getPathComponents(normalized2);
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('  Components1:', comp1);
-      console.log('  Components2:', comp2);
-    }
     
     // Try various matching strategies
     const strategies = [
@@ -127,9 +113,6 @@ describe('GitOps module (integration)', () => {
     for (let i = 0; i < strategies.length; i++) {
       try {
         if (strategies[i]()) {
-          if (process.env.CI || process.env.DEBUG_TESTS) {
-            console.log(`  Result: MATCH (strategy ${i + 1})`);
-          }
           return true;
         }
       } catch (error) {
@@ -137,27 +120,16 @@ describe('GitOps module (integration)', () => {
       }
     }
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('  Result: NO MATCH');
-    }
     
     return false;
   }
   
   // Helper to find worktree by path
   function hasWorktree(worktrees, targetPath) {
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('\n[DEBUG] hasWorktree called:');
-      console.log('  Looking for:', targetPath);
-      console.log('  In worktrees:', worktrees.map(wt => wt.path));
-    }
     
     // Try exact match first
     let found = worktrees.some(wt => pathsEqual(wt.path, targetPath));
     
-    if (process.env.CI || process.env.DEBUG_TESTS) {
-      console.log('  Exact match found:', found);
-    }
     
     // If not found, try matching by the last part of the path (worktree name)
     if (!found) {
@@ -166,9 +138,6 @@ describe('GitOps module (integration)', () => {
         const wtName = path.basename(wt.path);
         const isWorktreeMatch = wtName === targetName && wt.path.includes('.worktrees');
         
-        if (process.env.CI || process.env.DEBUG_TESTS && isWorktreeMatch) {
-          console.log('  Basename match found:', wtName, '===', targetName);
-        }
         
         return isWorktreeMatch;
       });
@@ -192,9 +161,6 @@ describe('GitOps module (integration)', () => {
           const worktreeEnd = worktreeParts.slice(-segCount).join('/');
           
           if (targetEnd && worktreeEnd && targetEnd === worktreeEnd) {
-            if (process.env.CI || process.env.DEBUG_TESTS) {
-              console.log('  Path ending match found:', targetEnd);
-            }
             return true;
           }
         }
@@ -203,29 +169,6 @@ describe('GitOps module (integration)', () => {
       });
     }
     
-    // Debug output if not found and in CI (enhanced debugging)
-    if (!found && (process.env.CI || process.env.DEBUG_TESTS)) {
-      console.log('\n[DEBUG] hasWorktree failed to find match:');
-      console.log('  Looking for:', targetPath);
-      console.log('  Target basename:', path.basename(targetPath));
-      console.log('  Platform:', process.platform);
-      
-      if (process.platform === 'win32') {
-        console.log('  Normalized target:', targetPath.replace(/\\/g, '/').toLowerCase());
-      }
-      
-      console.log('  Available worktrees:');
-      worktrees.forEach((wt, index) => {
-        console.log(`    ${index}: Path: ${wt.path}`);
-        console.log(`    ${index}: Branch: ${wt.branch}`);
-        console.log(`    ${index}: Basename: ${path.basename(wt.path)}`);
-        
-        if (process.platform === 'win32') {
-          console.log(`    ${index}: Normalized: ${wt.path.replace(/\\/g, '/').toLowerCase()}`);
-          console.log(`    ${index}: pathsEqual result: ${pathsEqual(wt.path, targetPath)}`);
-        }
-      });
-    }
     
     return found;
   }
@@ -234,10 +177,6 @@ describe('GitOps module (integration)', () => {
     repo = new TestRepository();
     await repo.init();
     
-    // Minimal logging for CI setup
-    if (process.env.DEBUG_GITOPS_SETUP) {
-      console.log('\n[DEBUG] GitOps test setup:', repo.dir);
-    }
     
     // Ensure we're on the main branch (repo.init() already creates it)
     try {
@@ -306,12 +245,6 @@ describe('GitOps module (integration)', () => {
     test('creates worktree for new branch with base branch', async () => {
       const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
       
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log('\n[DEBUG] createWorktree test:');
-        console.log('  Target worktree path:', worktreePath);
-        console.log('  Platform:', process.platform);
-        console.log('  Repo dir:', repo.dir);
-      }
       
       // Ensure the parent directory exists
       await fs.mkdir(path.dirname(worktreePath), { recursive: true });
@@ -321,14 +254,6 @@ describe('GitOps module (integration)', () => {
       // Verify worktree exists
       const worktrees = await gitOps.listWorktrees();
       
-      if (process.env.CI || process.env.DEBUG_TESTS) {
-        console.log('  Found worktrees after creation:');
-        worktrees.forEach((wt, index) => {
-          console.log(`    ${index}: ${wt.path} (${wt.branch})`);
-        });
-        console.log('  Looking for path:', worktreePath);
-        console.log('  hasWorktree result:', hasWorktree(worktrees, worktreePath));
-      }
       
       expect(hasWorktree(worktrees, worktreePath)).toBe(true);
       
@@ -414,7 +339,6 @@ describe('GitOps module (integration)', () => {
       try {
         worktrees = await gitOps.listWorktrees();
       } catch (error) {
-        console.error('[DEBUG] Error calling listWorktrees:', error);
         throw error;
       }
       
@@ -431,21 +355,11 @@ describe('GitOps module (integration)', () => {
       
       // Only debug if the test is failing
       if (!mainRepoFound) {
-        console.log('\n[DEBUG] listWorktrees test failing - no main repo found:');
-        console.log('  Platform:', process.platform);
-        console.log('  Found worktrees count:', worktrees.length);
-        
-        worktrees.forEach((wt, index) => {
-          console.log(`  Worktree ${index}: ${wt.path} [${wt.branch}] (bare: ${wt.bare}, has .worktrees: ${wt.path.includes('.worktrees')})`);
-        });
-        
         // If no main repo found but we have worktrees, it might be a git state issue
         // This can happen on Windows CI when git is in an unusual state
         if (worktrees.length > 0) {
-          console.log('[DEBUG] Git might be in unusual state.');
           // Skip this assertion on Windows CI if git is in a weird state
           if (process.platform === 'win32' && process.env.CI) {
-            console.log('[DEBUG] Skipping main repo assertion on Windows CI due to potential git state issues');
             return;
           }
         }

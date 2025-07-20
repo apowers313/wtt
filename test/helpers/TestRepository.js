@@ -49,19 +49,11 @@ class TestRepository {
     // Quote the tool path to handle spaces in Windows paths
     const fullCommand = `node "${this.toolPath}" ${command.replace('wt ', '')}`;
     
-    // Only log failing commands on CI to reduce noise
-    if (process.env.DEBUG_WT_COMMANDS) {
-      console.log('\n[DEBUG] Running wt command:', fullCommand);
-    }
     
     return await this.exec(fullCommand);
   }
   
   async git(command) {
-    // Only log git commands if specifically requested
-    if (process.env.DEBUG_GIT_COMMANDS) {
-      console.log('\n[DEBUG] Running git command:', `git ${command}`);
-    }
     
     return await this.exec(`git ${command}`);
   }
@@ -78,18 +70,6 @@ class TestRepository {
         stderr: stderr.trim() 
       };
       
-      // Only log command details if specifically requested or on failure
-      if (process.env.DEBUG_ALL_COMMANDS) {
-        const duration = Date.now() - startTime;
-        console.log('\n[DEBUG] Command execution:');
-        console.log('  Command:', command);
-        console.log('  Exit code:', result.exitCode);
-        console.log('  Duration:', `${duration}ms`);
-        
-        if (stdout.trim()) {
-          console.log('  STDOUT:', stdout.trim().split('\n').slice(0, 3).join('; ') + (stdout.trim().split('\n').length > 3 ? '...' : ''));
-        }
-      }
       
       return result;
     } catch (error) {
@@ -101,16 +81,6 @@ class TestRepository {
         stderr: error.stderr?.trim() || error.message 
       };
       
-      // Only log command failures when DEBUG_TESTS is enabled or in CI
-      const shouldLog = process.env.DEBUG_TESTS === 'true' || process.env.CI;
-      if (shouldLog) {
-        console.error('\n[ERROR] Command failed:', command);
-        console.error('  Exit code:', result.exitCode);
-        console.error('  Error:', error.message);
-        if (result.stderr) {
-          console.error('  STDERR:', result.stderr);
-        }
-      }
       
       return result;
     }
