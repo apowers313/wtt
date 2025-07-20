@@ -36,7 +36,14 @@ describe('wt switch command', () => {
     
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('cd ');
-    expect(result.stdout).toContain(path.join('.worktrees', 'wt-feature-test'));
+    
+    // Handle platform-specific path separators
+    const expectedPath = path.join('.worktrees', 'wt-feature-test');
+    const pathInOutput = result.stdout.includes(expectedPath) || 
+                        result.stdout.includes(expectedPath.replace(/\\/g, '/')) ||
+                        result.stdout.includes(expectedPath.replace(/\//g, '\\'));
+    
+    expect(pathInOutput).toBe(true);
   });
 
   test('fails when worktree not found', async () => {
@@ -70,6 +77,12 @@ describe('wt switch command', () => {
     }
     
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain(expectedPath);
+    
+    // Handle platform-specific path formats
+    const pathInOutput = result.stdout.includes(expectedPath) ||
+                        result.stdout.includes(expectedPath.replace(/\\/g, '/')) ||
+                        result.stdout.includes(expectedPath.replace(/\//g, '\\'));
+    
+    expect(pathInOutput).toBe(true);
   });
 });

@@ -59,11 +59,27 @@ describe('wt create command', () => {
       
       // Check .env.worktree - at minimum should have VITE_PORT
       const envPath = path.join('.worktrees', 'wt-feature-test', '.env.worktree');
-      const envContent = await repo.readFile(envPath);
       
-      // Must have at least VITE_PORT and WORKTREE_NAME
-      expect(envContent).toMatch(/VITE_PORT=\d{4}/);
-      expect(envContent).toContain('WORKTREE_NAME=wt-feature-test');
+      let envContent;
+      try {
+        envContent = await repo.readFile(envPath);
+        
+        if (process.env.CI || process.env.DEBUG_TESTS) {
+          console.log('  .env.worktree content:', envContent);
+        }
+        
+        // Must have at least VITE_PORT and WORKTREE_NAME
+        expect(envContent).toMatch(/VITE_PORT=\d{4}/);
+        expect(envContent).toContain('WORKTREE_NAME=wt-feature-test');
+      } catch (error) {
+        if (process.env.CI || process.env.DEBUG_TESTS) {
+          console.log('  Failed to read .env.worktree:', error.message);
+          console.log('  Checking if file exists...');
+          const exists = await repo.exists(envPath);
+          console.log('  File exists:', exists);
+        }
+        throw error;
+      }
       
       // STORYBOOK_PORT is optional depending on config
       if (envContent.includes('STORYBOOK_PORT')) {
