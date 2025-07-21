@@ -1,5 +1,4 @@
 const PathUtils = require('../../lib/pathUtils');
-const path = require('path');
 
 /**
  * Platform-agnostic test utilities for cross-platform testing
@@ -111,7 +110,6 @@ class PlatformTestUtils {
    * @returns {Function} Matcher function
    */
   static createPathMatcher(expectedPath) {
-    const normalized = PathUtils.normalize(expectedPath);
     const worktreeName = PathUtils.extractWorktreeName(expectedPath);
     
     return (actualPath) => {

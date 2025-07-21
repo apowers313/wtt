@@ -59,7 +59,7 @@ class TestRepository {
   }
   
   async exec(command) {
-    const startTime = Date.now();
+    // const startTime = Date.now();
     
     try {
       const { stdout, stderr } = await execAsync(command, { cwd: this.dir });
@@ -73,7 +73,7 @@ class TestRepository {
       
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      // const duration = Date.now() - startTime;
       
       const result = { 
         exitCode: error.code || 1, 

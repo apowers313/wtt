@@ -12,7 +12,6 @@ async function removeCommand(worktreeName, options) {
     await gitOps.validateRepository();
     await config.load();
     
-    const cfg = config.get();
     await portManager.init(config.getBaseDir());
     
     const worktreePath = config.getWorktreePath(worktreeName);
@@ -57,7 +56,7 @@ async function removeCommand(worktreeName, options) {
         }
         
         if (!confirmRemove) {
-            return;
+          return;
         }
         
         options.force = true;
@@ -82,7 +81,7 @@ async function removeCommand(worktreeName, options) {
         }
         
         if (!confirmRemove) {
-            return;
+          return;
         }
       }
     }

@@ -102,8 +102,8 @@ describe('GitOps module (integration)', () => {
         const both_worktrees = normalized1.includes('.worktrees') && normalized2.includes('.worktrees');
         if (both_worktrees) {
           // Extract worktree name (should be after .worktrees/)
-          const wt1_match = normalized1.match(/\.worktrees[\/\\]([^\/\\]+)/);
-          const wt2_match = normalized2.match(/\.worktrees[\/\\]([^\/\\]+)/);
+          const wt1_match = normalized1.match(/\.worktrees[/\\]([^/\\]+)/);
+          const wt2_match = normalized2.match(/\.worktrees[/\\]([^/\\]+)/);
           return wt1_match && wt2_match && wt1_match[1] === wt2_match[1];
         }
         return false;
@@ -286,7 +286,7 @@ describe('GitOps module (integration)', () => {
       const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
       
       await expect(gitOps.createWorktree(worktreePath, 'feature', 'main'))
-        .rejects.toThrow("Branch 'feature' already exists");
+        .rejects.toThrow('Branch \'feature\' already exists');
     });
   });
 
@@ -335,12 +335,7 @@ describe('GitOps module (integration)', () => {
     });
 
     test('handles empty worktree list', async () => {
-      let worktrees;
-      try {
-        worktrees = await gitOps.listWorktrees();
-      } catch (error) {
-        throw error;
-      }
+      const worktrees = await gitOps.listWorktrees();
       
       // Should at least have the main worktree
       expect(worktrees.length).toBeGreaterThanOrEqual(1);

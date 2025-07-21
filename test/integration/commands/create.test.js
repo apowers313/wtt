@@ -1,5 +1,4 @@
 const { WorktreeTestHelpers } = require('../../helpers/WorktreeTestHelpers');
-const { AsyncTestHelpers } = require('../../helpers/InteractiveTestHelpers');
 const path = require('path');
 
 describe('wt create command', () => {

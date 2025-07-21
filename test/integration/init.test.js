@@ -1,5 +1,4 @@
 const { TestRepository } = require('../helpers/TestRepository');
-const { WorktreeTestHelpers } = require('../helpers/WorktreeTestHelpers');
 const path = require('path');
 
 describe('wt init command', () => {

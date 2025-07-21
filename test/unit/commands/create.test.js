@@ -28,8 +28,7 @@ const { createCommand } = require('../../../commands/create');
 const {
   createMockGitOps,
   createMockPortManager,
-  createMockConfig,
-  createMockFileSystem
+  createMockConfig
 } = require('../../setup/mockHelpers');
 const chalk = require('chalk');
 const path = require('path');
@@ -176,7 +175,7 @@ describe('create command', () => {
     
     expect(mockConsole.error).toHaveBeenCalledWith(
       chalk.red('Error:'),
-      "Base branch 'nonexistent' does not exist"
+      'Base branch \'nonexistent\' does not exist'
     );
     expect(mockExit).toHaveBeenCalledWith(1);
   });

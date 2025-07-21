@@ -66,7 +66,7 @@ describe('wt switch command', () => {
     
     // Additional check: if output contains "cd " followed by any path ending with wt-feature-test
     if (!pathInOutput) {
-      const cdPattern = /cd\s+(.+[\\\/]wt-feature-test)/;
+      const cdPattern = /cd\s+(.+[\\/]wt-feature-test)/;
       const match = result.stdout.match(cdPattern);
       if (match) {
         pathInOutput = true;

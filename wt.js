@@ -2,12 +2,7 @@
 
 const { Command } = require('commander');
 const chalk = require('chalk');
-const path = require('path');
-const fs = require('fs').promises;
-
 const config = require('./lib/config');
-const portManager = require('./lib/portManager');
-const gitOps = require('./lib/gitOps');
 const { createCommand } = require('./commands/create');
 const { listCommand } = require('./commands/list');
 const { switchCommand } = require('./commands/switch');

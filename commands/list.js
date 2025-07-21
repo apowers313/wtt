@@ -3,14 +3,12 @@ const path = require('path');
 const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
-const PathUtils = require('../lib/pathUtils');
 
 async function listCommand(options) {
   try {
     await gitOps.validateRepository();
     await config.load();
     
-    const cfg = config.get();
     await portManager.init(config.getBaseDir());
     
     const worktrees = await gitOps.listWorktrees();

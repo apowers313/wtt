@@ -10,7 +10,6 @@ async function switchCommand(worktreeName) {
     await gitOps.validateRepository();
     await config.load();
     
-    const cfg = config.get();
     await portManager.init(config.getBaseDir());
     
     const worktreePath = config.getWorktreePath(worktreeName);
@@ -44,6 +43,7 @@ async function switchCommand(worktreeName) {
         }
       }
     } catch {
+      // package.json doesn't exist or is invalid
     }
     
     console.log('\n' + chalk.cyan('To navigate to this worktree:'));

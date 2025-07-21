@@ -10,7 +10,7 @@ describe('Simple integration test', () => {
     const wtPath = path.resolve(__dirname, '../../wt.js');
     
     try {
-      const { stdout, stderr } = await execAsync(`node "${wtPath}" --help`);
+      const { stdout } = await execAsync(`node "${wtPath}" --help`);
       
       expect(stdout).toContain('Usage: wt [options] [command]');
       expect(stdout).toContain('init');

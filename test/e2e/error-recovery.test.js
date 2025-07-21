@@ -1,6 +1,5 @@
 const { WorktreeTestHelpers } = require('../helpers/WorktreeTestHelpers');
 const { InteractiveTestHelpers, AsyncTestHelpers } = require('../helpers/InteractiveTestHelpers');
-const fs = require('fs').promises;
 const fsExtra = require('fs-extra');
 const path = require('path');
 

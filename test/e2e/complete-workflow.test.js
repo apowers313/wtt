@@ -131,8 +131,8 @@ describe('Complete feature development workflow', () => {
     await repo.git('commit -m "Add base config"');
     
     // Create two features that will conflict
-    const create1 = await repo.run('create feature-update-version --from main');
-    const create2 = await repo.run('create feature-add-settings --from main');
+    await repo.run('create feature-update-version --from main');
+    await repo.run('create feature-add-settings --from main');
     
     // Update version in first feature
     await repo.inWorktree('wt-feature-update-version', async () => {

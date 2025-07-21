@@ -1,4 +1,3 @@
-const fs = require('fs-extra');
 const path = require('path');
 
 /**
@@ -151,7 +150,7 @@ class WorktreeTestHelpers {
                   result.stdout.includes('failed');
     
     if (!failed) {
-      throw new Error(`Expected command to fail but it succeeded`);
+      throw new Error('Expected command to fail but it succeeded');
     }
     
     if (expectedError) {

@@ -88,6 +88,7 @@ async function createCommand(branchName, options) {
         console.log(chalk.gray(`  npm run storybook  # Runs on port ${ports.storybook}`));
       }
     } catch {
+      // package.json doesn't exist, skip usage instructions
     }
     
   } catch (error) {

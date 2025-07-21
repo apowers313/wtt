@@ -53,7 +53,7 @@ async function portsCommand(worktreeName) {
         
         if (reassign) {
           const allPorts = portManager.getAllUsedPorts();
-          for (const { service, port } of conflicts) {
+          for (const { service } of conflicts) {
             const range = cfg.portRanges[service];
             const newPort = portManager.findAvailablePort(range, allPorts);
             ports[service] = newPort;
