@@ -1,5 +1,10 @@
 # Git Worktree Tool (wtt)
 
+[![Test](https://github.com/apowers313/wtt/actions/workflows/test.yml/badge.svg)](https://github.com/apowers313/wtt/actions/workflows/test.yml)
+[![Coverage Status](https://coveralls.io/repos/github/apowers313/wtt/badge.svg?branch=master)](https://coveralls.io/github/apowers313/wtt?branch=master)
+[![npm version](https://badge.fury.io/js/wtt.svg)](https://www.npmjs.com/package/wtt)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A powerful command-line tool that streamlines git worktree workflows for parallel feature development, with automatic port management for development servers like Vite, Storybook, and more.
 
 ## Table of Contents

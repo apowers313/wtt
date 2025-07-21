@@ -25,8 +25,13 @@ dist-ssr
 TODO
 *~
 coverage/
+.nyc_output/
+*.lcov
 
 # Generated TypeScript files in root (from tsconfig.build.json)
 /index.js
 /index.d.ts
 /index.d.ts.map
+
+# Husky
+.husky/_

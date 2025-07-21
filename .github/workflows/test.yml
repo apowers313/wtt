@@ -1,65 +1,107 @@
-name: Tests
+name: Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [master, main]
   pull_request:
-    branches: [ master ]
+    branches: [master, main]
+
+env:
+  HUSKY: 0
 
 jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [20, 22, lts/*]
-      fail-fast: false
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node }}
-    
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.npm
-        key: ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-${{ matrix.node }}-
-          ${{ runner.os }}-node-
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['lts/*']
+        include:
+          - os: ubuntu-latest
+            node-version: '18.x'
+          - os: ubuntu-latest
+            node-version: '20.x'
 
-    - name: Install dependencies
-      run: |
-        npm --version
-        node --version
-        # Clean install with error handling
-        npm ci --no-audit --no-fund || (rm -rf node_modules package-lock.json && npm install --no-audit --no-fund)
-    
-    - name: Verify installation
-      run: |
-        npm list --depth=0
-        node -e "console.log('Node modules installed successfully')"
-    
-    - name: Run unit tests
-      run: npm run test:unit
-      env:
-        DEBUG_TESTS: true
-        DEBUG_GIT: true
-    
-    - name: Run integration tests
-      run: npm run test:integration
-      env:
-        DEBUG_TESTS: true
-        DEBUG_GIT: true
-      
-    - name: Run E2E tests
-      run: npm run test:e2e
-      if: matrix.os == 'ubuntu-latest' # Run E2E only on Linux for speed
-    
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-      if: matrix.os == 'ubuntu-latest' && matrix.node == '18'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Type check
+        run: npm run typecheck --if-present
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Generate coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 'lts/*'
+        run: npm run test:coverage
+
+      - name: Upload coverage reports to Coveralls
+        uses: coverallsapp/github-action@v2
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 'lts/*'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./coverage/lcov.info
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 'lts/*'
+        with:
+          name: coverage-report
+          path: |
+            coverage/
+            !coverage/tmp/
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    permissions:
+      contents: write       # to create release
+      issues: write        # to comment on issues
+      pull-requests: write # to comment on PRs
+      id-token: write      # to enable OIDC for npm provenance
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
+        run: npm audit signatures
+
+      - name: Build
+        run: npm run build --if-present
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
