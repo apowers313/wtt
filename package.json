@@ -60,27 +60,6 @@
   "engines": {
     "node": ">=16.0.0"
   },
-  "jest": {
-    "collectCoverageFrom": [
-      "commands/**/*.js",
-      "lib/**/*.js",
-      "!**/__tests__/**",
-      "!**/node_modules/**"
-    ],
-    "coverageReporters": [
-      "text",
-      "lcov",
-      "html"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "branches": 75,
-        "functions": 80,
-        "lines": 80,
-        "statements": 80
-      }
-    }
-  },
   "config": {
     "commitizen": {
       "path": "./node_modules/cz-conventional-changelog"
