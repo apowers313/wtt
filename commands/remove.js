@@ -18,7 +18,15 @@ async function removeCommand(worktreeName, options) {
     const worktreePath = config.getWorktreePath(worktreeName);
     
     const worktrees = await gitOps.listWorktrees();
-    const worktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
+    let worktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
+    
+    // Fallback: Try matching by worktree name if path matching fails
+    if (!worktree) {
+      worktree = worktrees.find(wt => {
+        const wtName = path.basename(wt.path);
+        return wtName === worktreeName;
+      });
+    }
     
     // Check if we have tracking data even if git doesn't know about the worktree
     const ports = portManager.getPorts(worktreeName);
@@ -102,8 +110,15 @@ async function removeCommand(worktreeName, options) {
     
     // Only remove git worktree if it actually exists
     if (worktree) {
+      // Check if this is a broken worktree (directory doesn't exist)
+      const directoryExists = await fs.access(worktreePath).then(() => true).catch(() => false);
+      
       await gitOps.removeWorktree(worktreePath, options.force);
       console.log(chalk.green('✓ Removed worktree'));
+      
+      if (!directoryExists) {
+        console.log(chalk.green('✓ Cleaned up broken worktree registration'));
+      }
     } else {
       // Clean up any remaining directory if it exists
       try {
@@ -111,6 +126,7 @@ async function removeCommand(worktreeName, options) {
         console.log(chalk.green('✓ Removed worktree directory'));
       } catch (error) {
         // Directory might not exist, that's fine
+        console.log(chalk.green('✓ Cleaned up worktree tracking'));
       }
     }
     
