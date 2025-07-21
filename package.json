@@ -1,5 +1,5 @@
 {
-  "name": "wtt",
+  "name": "worktree-tool",
   "version": "1.0.0",
   "description": "Git Worktree Tool - Streamline git worktree workflows with automatic port management",
   "main": "wt.js",
