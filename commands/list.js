@@ -19,8 +19,14 @@ async function listCommand(options) {
       const normalizedPath = PathUtils.normalize(wt.path);
       const normalizedBaseDir = PathUtils.normalize(cfg.baseDir);
       const normalizedCwd = PathUtils.normalize(process.cwd());
-      return normalizedPath.includes(normalizedBaseDir) && 
-        !normalizedPath.endsWith(normalizedCwd);
+      
+      // Use PathUtils.equals for the CWD comparison to handle Windows paths properly
+      // Also check if the path is under the baseDir using a more robust comparison
+      const isUnderBaseDir = normalizedPath.startsWith(normalizedBaseDir) || 
+                            normalizedPath.includes(normalizedBaseDir);
+      const isNotCwd = !PathUtils.equals(normalizedPath, normalizedCwd);
+      
+      return isUnderBaseDir && isNotCwd;
     });
     
     if (managedWorktrees.length === 0) {

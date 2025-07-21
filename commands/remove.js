@@ -103,12 +103,12 @@ async function removeCommand(worktreeName, options) {
     // Only remove git worktree if it actually exists
     if (worktree) {
       await gitOps.removeWorktree(worktreePath, options.force);
-      console.log('✓ Removed worktree');
+      console.log(chalk.green('✓ Removed worktree'));
     } else {
       // Clean up any remaining directory if it exists
       try {
         await fs.rm(worktreePath, { recursive: true });
-        console.log('✓ Cleaned up worktree directory');
+        console.log(chalk.green('✓ Removed worktree directory'));
       } catch (error) {
         // Directory might not exist, that's fine
       }
