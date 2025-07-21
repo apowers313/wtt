@@ -23,18 +23,29 @@ async function portsCommand(worktreeName) {
       console.log(`\nPorts for worktree '${worktreeName}':`);
       
       for (const [service, port] of Object.entries(ports)) {
-        const isInUse = await portManager.isPortInUse(port);
-        const status = isInUse ? ' (in use)' : ' (available)';
+        let status = '';
+        try {
+          const isInUse = await portManager.isPortInUse(port);
+          status = isInUse ? ' (in use)' : ' (available)';
+        } catch (error) {
+          // Port checking might fail in some environments
+          status = '';
+        }
         console.log(`  ${service}: ${port}${status}`);
       }
       
       const conflicts = [];
       for (const [service, port] of Object.entries(ports)) {
-        if (await portManager.isPortInUse(port)) {
-          const runningPorts = await portManager.getRunningPorts(worktreeName);
-          if (!runningPorts[service]) {
-            conflicts.push({ service, port });
+        try {
+          if (await portManager.isPortInUse(port)) {
+            const runningPorts = await portManager.getRunningPorts(worktreeName);
+            if (!runningPorts[service]) {
+              conflicts.push({ service, port });
+            }
           }
+        } catch (error) {
+          // Port checking might fail in some environments
+          // Skip conflict detection for this port
         }
       }
       
@@ -51,14 +62,16 @@ async function portsCommand(worktreeName) {
           default: true
         }]);
         
-        if (reassign) {
+        if (reassign && cfg.portRanges) {
           const allPorts = portManager.getAllUsedPorts();
           for (const { service } of conflicts) {
             const range = cfg.portRanges[service];
-            const newPort = portManager.findAvailablePort(range, allPorts);
-            ports[service] = newPort;
-            allPorts.push(newPort);
-            console.log(`✓ Reassigned ${service} to port ${newPort}`);
+            if (range) {
+              const newPort = portManager.findAvailablePort(range, allPorts);
+              ports[service] = newPort;
+              allPorts.push(newPort);
+              console.log(`✓ Reassigned ${service} to port ${newPort}`);
+            }
           }
           
           portManager.portMap[worktreeName] = {
@@ -84,8 +97,14 @@ async function portsCommand(worktreeName) {
         console.log('\n' + worktreeName);
         
         for (const [service, port] of Object.entries(ports)) {
-          const isInUse = await portManager.isPortInUse(port);
-          const status = isInUse ? ' ✓' : '';
+          let status = '';
+          try {
+            const isInUse = await portManager.isPortInUse(port);
+            status = isInUse ? ' ✓' : '';
+          } catch (error) {
+            // Port checking might fail in some environments (e.g., CI)
+            // Just continue without the status indicator
+          }
           console.log(`  ${service}: ${port}${status}`);
         }
       }
@@ -94,8 +113,10 @@ async function portsCommand(worktreeName) {
       console.log('\n' + `Total ports in use: ${usedPorts.length}`);
       
       console.log('\n' + 'Port ranges:');
-      for (const [service, range] of Object.entries(cfg.portRanges)) {
-        console.log(`  ${service}: ${range.start}-${range.start + 100} (increment: ${range.increment})`);
+      if (cfg.portRanges) {
+        for (const [service, range] of Object.entries(cfg.portRanges)) {
+          console.log(`  ${service}: ${range.start}-${range.start + 100} (increment: ${range.increment})`);
+        }
       }
     }
     
