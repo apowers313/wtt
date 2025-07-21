@@ -18,30 +18,19 @@ async function mergeCommand(worktreeName, options) {
     
     const worktrees = await gitOps.listWorktrees();
     
-    // Debug: Show what we're comparing
-    console.log('[DEBUG] merge - Looking for worktree:', worktreeName);
-    console.log('[DEBUG] merge - Expected path from config:', worktreePath);
-    console.log('[DEBUG] merge - All worktrees:', worktrees.map(wt => ({
-      path: wt.path,
-      branch: wt.branch
-    })));
-    
     // Try multiple matching strategies
     let worktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
     
     if (!worktree) {
       // Fallback: Try matching by worktree name in the path
-      console.log('[DEBUG] merge - Direct path match failed, trying name-based match');
       worktree = worktrees.find(wt => {
         const wtName = path.basename(wt.path);
-        console.log(`[DEBUG] merge - Comparing worktree name "${wtName}" with "${worktreeName}"`);
         return wtName === worktreeName;
       });
     }
     
     if (!worktree) {
       // Last resort: Try matching by branch name
-      console.log('[DEBUG] merge - Name match failed, trying branch-based match');
       const expectedBranch = worktreeName.replace(/^wt-/, ''); // Remove wt- prefix
       worktree = worktrees.find(wt => wt.branch === expectedBranch);
     }

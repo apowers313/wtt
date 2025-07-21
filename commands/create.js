@@ -75,17 +75,17 @@ async function createCommand(branchName, options) {
     
     
     console.log('\n' + 'To start working:');
-    console.log(`  cd ${worktreePath}`);
+    console.log(chalk.gray(`  cd ${worktreePath}`));
     
     const packageJsonPath = path.join(worktreePath, 'package.json');
     try {
       await fs.access(packageJsonPath);
       const services = Object.keys(ports);
       if (services.includes('vite')) {
-        console.log(`  npm run dev        # Runs on port ${ports.vite}`);
+        console.log(chalk.gray(`  npm run dev        # Runs on port ${ports.vite}`));
       }
       if (services.includes('storybook')) {
-        console.log(`  npm run storybook  # Runs on port ${ports.storybook}`);
+        console.log(chalk.gray(`  npm run storybook  # Runs on port ${ports.storybook}`));
       }
     } catch {
     }
