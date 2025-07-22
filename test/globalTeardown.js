@@ -11,13 +11,23 @@ module.exports = async () => {
       
       for (const repo of repos) {
         const repoPath = path.join(global.__TEST_DIR__, repo);
-        const stats = await fs.stat(repoPath);
-        if (stats.mtimeMs < oneHourAgo) {
-          await fs.remove(repoPath);
+        try {
+          const stats = await fs.stat(repoPath);
+          if (stats.mtimeMs < oneHourAgo) {
+            await fs.remove(repoPath);
+          }
+        } catch (error) {
+          // Ignore errors for individual repos (they might have been cleaned up already)
+          if (error.code !== 'ENOENT') {
+            console.warn(`Warning: Could not clean up ${repoPath}:`, error.message);
+          }
         }
       }
     } catch (error) {
-      // Ignore cleanup errors
+      // Ignore errors if the test directory doesn't exist
+      if (error.code !== 'ENOENT') {
+        console.warn('Warning: Could not clean up test directory:', error.message);
+      }
     }
   }
 };

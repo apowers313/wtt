@@ -6,6 +6,7 @@ const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const PathUtils = require('../lib/pathUtils');
+const { addCommandContext } = require('../lib/errorTranslator');
 
 async function removeCommand(worktreeName, options) {
   try {
@@ -32,7 +33,7 @@ async function removeCommand(worktreeName, options) {
     const hasTrackingData = ports || await fs.access(worktreePath).then(() => true).catch(() => false);
     
     if (!worktree && !hasTrackingData) {
-      throw new Error(`Worktree '${worktreeName}' not found`);
+      throw new Error(`Worktree '${worktreeName}' doesn't exist. Use 'wt list' to see available worktrees`);
     }
     
     
@@ -142,6 +143,11 @@ async function removeCommand(worktreeName, options) {
     
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
+    const context = addCommandContext(error.message, 'remove');
+    if (context.tips && context.tips.length > 0) {
+      console.error(chalk.yellow('\nTips:'));
+      context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
+    }
     process.exit(1);
   }
 }

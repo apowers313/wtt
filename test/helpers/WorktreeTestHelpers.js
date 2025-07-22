@@ -59,10 +59,11 @@ class WorktreeTestHelpers {
   }
 
   /**
-   * Remove a worktree, handling the wt- prefix
+   * Remove a worktree, using the configured naming pattern
    */
   async removeWorktree(branch, options = {}) {
-    const worktreeName = branch.startsWith('wt-') ? branch : `wt-${branch}`;
+    // With current config using {branch} pattern, worktree name is just the branch name
+    const worktreeName = branch;
     const args = [worktreeName];
     if (options.force) args.push('--force');
     
@@ -76,7 +77,8 @@ class WorktreeTestHelpers {
     const { removeCommand } = require('../../commands/remove-refactored');
     const { TestPrompter } = require('../../lib/prompter');
     
-    const worktreeName = branch.startsWith('wt-') ? branch : `wt-${branch}`;
+    // With current config using {branch} pattern, worktree name is just the branch name
+    const worktreeName = branch;
     const prompter = new TestPrompter(responses);
     
     // Change to the test repo directory
@@ -236,7 +238,8 @@ class WorktreeTestHelpers {
    * Check if worktree exists with retries for timing issues
    */
   async expectWorktreeExists(branch, shouldExist = true) {
-    const name = branch.startsWith('wt-') ? branch : `wt-${branch}`;
+    // With current config using {branch} pattern, worktree name is just the branch name
+    const name = branch;
     const worktreePath = path.join('.worktrees', name);
     
     
@@ -259,7 +262,8 @@ class WorktreeTestHelpers {
    */
   async expectWorktreeStatus(branch, expectedStatus) {
     const result = await this.repo.run('list -v');
-    const name = branch.startsWith('wt-') ? branch : `wt-${branch}`;
+    // With current config using {branch} pattern, worktree name is just the branch name
+    const name = branch;
     
     const statusAliases = {
       'clean': ['clean', 'Clean', 'up to date', ''],
@@ -283,7 +287,8 @@ class WorktreeTestHelpers {
    * Check if ports are assigned
    */
   async expectPortsAssigned(branch, services) {
-    const name = branch.startsWith('wt-') ? branch : `wt-${branch}`;
+    // With current config using {branch} pattern, worktree name is just the branch name
+    const name = branch;
     const portMapPath = path.join('.worktrees', '.port-map.json');
     
     
@@ -318,7 +323,8 @@ class WorktreeTestHelpers {
    * Check environment file
    */
   async expectEnvFile(branch, variables) {
-    const name = branch.startsWith('wt-') ? branch : `wt-${branch}`;
+    // With current config using {branch} pattern, worktree name is just the branch name
+    const name = branch;
     const envPath = path.join('.worktrees', name, '.env.worktree');
     
     const content = await this.repo.readFile(envPath);
@@ -337,7 +343,8 @@ class WorktreeTestHelpers {
    * Get worktree name with prefix
    */
   getWorktreeName(branch) {
-    return branch.startsWith('wt-') ? branch : `wt-${branch}`;
+    // With current config using {branch} pattern, worktree name is just the branch name
+    return branch;
   }
 
   /**

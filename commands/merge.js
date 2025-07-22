@@ -5,6 +5,7 @@ const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const PathUtils = require('../lib/pathUtils');
+const { addCommandContext } = require('../lib/errorTranslator');
 
 async function mergeCommand(worktreeName, options) {
   try {
@@ -30,18 +31,17 @@ async function mergeCommand(worktreeName, options) {
     }
     
     if (!worktree) {
-      // Last resort: Try matching by branch name
-      const expectedBranch = worktreeName.replace(/^wt-/, ''); // Remove wt- prefix
-      worktree = worktrees.find(wt => wt.branch === expectedBranch);
+      // Last resort: Try matching by branch name directly
+      worktree = worktrees.find(wt => wt.branch === worktreeName);
     }
     
     if (!worktree) {
-      throw new Error(`Worktree '${worktreeName}' not found`);
+      throw new Error(`Worktree '${worktreeName}' doesn't exist. Use 'wt list' to see available worktrees`);
     }
     
     const branchName = worktree.branch;
     if (!branchName) {
-      throw new Error('Could not determine branch name for worktree');
+      throw new Error('Unable to determine which branch this worktree is using. The worktree may be in a detached HEAD state or corrupted. Try "wt remove" and recreate it');
     }
     
     console.log(chalk.blue(`Checking worktree '${worktreeName}'...`));
@@ -86,11 +86,14 @@ async function mergeCommand(worktreeName, options) {
     console.log(chalk.green(`✓ Switched to branch '${mainBranch}'`));
     console.log(chalk.green(`✓ Merged '${branchName}'`));
     
-    if (options.delete) {
+    // Check if we should clean up based on config or explicit option
+    const shouldConsiderCleanup = options.delete || (cfg.autoCleanup && !options.noDelete);
+    
+    if (shouldConsiderCleanup) {
       let confirmDelete = true;
       
       // In test environment, auto-confirm deletions, otherwise prompt
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== 'test' && !cfg.autoCleanup) {
         const result = await inquirer.prompt([{
           type: 'confirm',
           name: 'confirmDelete',
@@ -108,7 +111,7 @@ async function mergeCommand(worktreeName, options) {
           await gitOps.deleteBranch(branchName);
           console.log(chalk.green(`✓ Deleted branch '${branchName}'`));
         } catch (error) {
-          console.log(chalk.yellow(`⚠ Could not delete branch: ${error.message}`));
+          console.log(chalk.yellow('⚠ Could not delete the branch automatically. You can delete it manually later'));
         }
         
         const ports = portManager.getPorts(worktreeName);
@@ -122,6 +125,11 @@ async function mergeCommand(worktreeName, options) {
     
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
+    const context = addCommandContext(error.message, 'merge');
+    if (context.tips && context.tips.length > 0) {
+      console.error(chalk.yellow('\nTips:'));
+      context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
+    }
     process.exit(1);
   }
 }

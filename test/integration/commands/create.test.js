@@ -57,7 +57,7 @@ describe('wt create command', () => {
       await helpers.expectWorktreeExists('feature-test');
       
       // Check .env.worktree - at minimum should have VITE_PORT
-      const envPath = path.join('.worktrees', 'wt-feature-test', '.env.worktree');
+      const envPath = path.join('.worktrees', 'feature-test', '.env.worktree');
       
       let envContent;
       try {
@@ -69,7 +69,7 @@ describe('wt create command', () => {
         
         // Must have at least VITE_PORT and WORKTREE_NAME
         expect(envContent).toMatch(/VITE_PORT=\d{4}/);
-        expect(envContent).toContain('WORKTREE_NAME=wt-feature-test');
+        expect(envContent).toContain('WORKTREE_NAME=feature-test');
       } catch (error) {
         if (process.env.CI || process.env.DEBUG_TESTS) {
           console.log('  Failed to read .env.worktree:', error.message);
@@ -97,7 +97,7 @@ describe('wt create command', () => {
       
       // Check git worktree
       const worktrees = await repo.git('worktree list');
-      expect(worktrees.stdout).toContain('wt-feature-test');
+      expect(worktrees.stdout).toContain('feature-test');
     });
 
     test('creates multiple worktrees with unique ports', async () => {

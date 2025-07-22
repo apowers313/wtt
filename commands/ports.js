@@ -3,6 +3,7 @@ const inquirer = require('inquirer');
 const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
+const { addCommandContext } = require('../lib/errorTranslator');
 
 async function portsCommand(worktreeName) {
   try {
@@ -122,6 +123,11 @@ async function portsCommand(worktreeName) {
     
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
+    const context = addCommandContext(error.message, 'ports');
+    if (context.tips && context.tips.length > 0) {
+      console.error(chalk.yellow('\nTips:'));
+      context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
+    }
     process.exit(1);
   }
 }

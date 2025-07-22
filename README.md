@@ -21,6 +21,7 @@ A powerful command-line tool that streamlines git worktree workflows for paralle
   - [wt remove](#wt-remove)
   - [wt ports](#wt-ports)
 - [Configuration](#configuration)
+  - [Prompt Customization](#prompt-customization)
 - [Integration Guide](#integration-guide)
 - [Examples](#examples)
 - [Best Practices](#best-practices)
@@ -37,6 +38,7 @@ A powerful command-line tool that streamlines git worktree workflows for paralle
 - **Service Integration**: Seamless integration with Vite, Storybook, and custom development servers
 - **Interactive CLI**: User-friendly prompts with colored output for better visibility
 - **Environment Injection**: Automatic `.env.worktree` file generation for each worktree
+- **Works from Anywhere**: Run commands from any subdirectory in your repository or worktrees
 
 ### 🛡️ Safety Features
 
@@ -202,14 +204,17 @@ wt-feature-ui      feature-ui     vite:3020         5 files modified
 
 ### `wt switch`
 
-Display information about a worktree and show how to navigate to it.
+Switch to a worktree by spawning a new shell with a custom prompt.
 
 ```bash
-wt switch <worktree-name>
+wt switch <worktree-name> [options]
 ```
 
 **Arguments:**
 - `<worktree-name>` - Name of the worktree (e.g., `wt-feature-auth`)
+
+**Options:**
+- `--no-shell` - Just show information without spawning a shell
 
 **Example:**
 ```bash
@@ -228,11 +233,21 @@ Available npm scripts:
   npm run test
   npm run storybook
 
-To navigate to this worktree:
-  cd /home/user/project/.worktrees/wt-feature-auth
+Spawning shell in worktree directory...
+Type "exit" to return to your original directory
+
+⚡wt-feature-auth ~/project/.worktrees/wt-feature-auth ▶ 
 ```
 
-**Note**: This command cannot change your shell's directory. You must manually run the provided `cd` command.
+**Features:**
+- Spawns a new shell in the worktree directory
+- Custom prompt shows worktree name and git status
+- Environment variables `WT_WORKTREE` and `WT_WORKTREE_PATH` are set
+- Type `exit` to return to your original directory
+- Use `--no-shell` flag for the old behavior (just display information)
+
+**Custom Prompts:**
+The shell prompt can be customized in `.worktree-config.json`. See [Prompt Customization](#prompt-customization) for details.
 
 ### `wt merge`
 
@@ -247,6 +262,13 @@ wt merge <worktree-name> [options]
 
 **Options:**
 - `-d, --delete` - Delete worktree and branch after successful merge
+- `--no-delete` - Prevent automatic deletion even if `autoCleanup` is enabled
+
+**Automatic Cleanup:**
+When `autoCleanup` is set to `true` in the configuration (default), the worktree and branch are automatically deleted after a successful merge. You can:
+- Use `--no-delete` to prevent deletion for a specific merge
+- Set `autoCleanup: false` in `.worktree-config.json` to disable automatic cleanup globally
+- Use `--delete` to force deletion even when `autoCleanup` is disabled
 
 **Example:**
 ```bash
@@ -388,7 +410,8 @@ The tool uses `.worktree-config.json` in your repository root:
   - `increment`: Gap between assigned ports
 - **mainBranch**: Your main branch name (default: `main`)
 - **namePattern**: Naming pattern for worktrees (`{branch}` is replaced)
-- **autoCleanup**: Whether to clean up after merges (default: `true`)
+- **autoCleanup**: Automatically delete worktrees and branches after successful merges (default: `true`). When enabled, `wt merge` will clean up by default unless you use `--no-delete`
+- **prompts**: Custom shell prompts for each shell type (see [Prompt Customization](#prompt-customization) below)
 
 ### Adding Custom Services
 
@@ -406,6 +429,66 @@ To add a new service (e.g., a backend API):
 ```
 
 2. The tool will automatically assign ports for the new service
+
+### Prompt Customization
+
+The `wt switch` command spawns a new shell with a custom prompt that shows the worktree context. You can customize these prompts in your `.worktree-config.json`:
+
+```json
+{
+  "prompts": {
+    "bash": "{purple}⚡{green}{worktree}{purple}{dirty} {cyan}{cwd} {blue}▶{reset} ",
+    "zsh": "%F{magenta}⚡%f%F{green}{worktree}%f%F{magenta}{dirty}%f %F{cyan}{cwd}%f %F{blue}▶%f ",
+    "fish": "{magenta}⚡{green}{worktree}{magenta}{dirty} {cyan}{cwd} {blue}▶ {normal}",
+    "powershell": "{magenta}⚡{green}{worktree}{magenta}{dirty} {cyan}{cwd} {blue}▶ ",
+    "default": "[{worktree}]> "
+  }
+}
+```
+
+**Available Template Variables:**
+
+- `{worktree}` - Current worktree name
+- `{branch}` - Current git branch
+- `{cwd}` - Current working directory (with ~ for home)
+- `{pwd}` - Current working directory (full path)
+- `{dirty}` - Shows ✗ if there are uncommitted changes
+- `{dirty:text}` - Shows "text" if there are uncommitted changes
+- `{user}` - Current username
+- `{host}` - Hostname
+- `{time}` - Current time (HH:MM:SS)
+- `{date}` - Current date (YYYY-MM-DD)
+- `{port:service}` - Port for a specific service (e.g., `{port:vite}`)
+- `{exitcode}` - Exit code of last command
+
+**Color Codes:**
+
+- Basic colors: `{red}`, `{green}`, `{yellow}`, `{blue}`, `{magenta}`, `{purple}`, `{cyan}`, `{white}`
+- Reset colors: `{reset}` or `{normal}`
+
+**Shell-Specific Notes:**
+
+- **Bash**: Uses ANSI escape codes. Colors must be wrapped in `\[` and `\]`
+- **Zsh**: Uses `%F{color}` syntax for colors, `%f` to reset
+- **Fish**: Colors are applied via `set_color` commands
+- **PowerShell**: Colors are applied via `Write-Host -ForegroundColor`
+
+**Example Custom Prompts:**
+
+Simple prompt with branch name:
+```json
+"bash": "[{green}{worktree}{reset}:{yellow}{branch}{reset}] $ "
+```
+
+Prompt with time and exit code:
+```json
+"bash": "{blue}{time}{reset} {worktree}{red}{exitcode}{reset} > "
+```
+
+Two-line prompt with full information:
+```json
+"bash": "{blue}┌─{cyan}{user}@{host} {green}{worktree} {yellow}{branch}{purple}{dirty}\\n{blue}└─{cwd} ▶{reset} "
+```
 
 ## Integration Guide
 

@@ -75,7 +75,7 @@ describe('create command', () => {
         storybook: { start: 6000, end: 6099 }
       }
     });
-    mockConfig.getWorktreeName.mockImplementation(branch => `wt-${branch}`);
+    mockConfig.getWorktreeName.mockImplementation(branch => branch);
     mockConfig.getWorktreePath.mockImplementation(name => path.join('.worktrees', name));
     mockConfig.getBaseDir.mockReturnValue('/project');
     
@@ -104,7 +104,7 @@ describe('create command', () => {
     
     // Verify worktree creation
     expect(mockGitOps.createWorktree).toHaveBeenCalledWith(
-      path.join('.worktrees', 'wt-feature-test'),
+      path.join('.worktrees', 'feature-test'),
       'feature-test',
       null
     );
@@ -112,15 +112,15 @@ describe('create command', () => {
     // Verify port assignment
     expect(mockPortManager.init).toHaveBeenCalledWith('/project');
     expect(mockPortManager.assignPorts).toHaveBeenCalledWith(
-      'wt-feature-test',
+      'feature-test',
       ['vite', 'storybook'],
       { vite: { start: 3000, end: 3099 }, storybook: { start: 6000, end: 6099 } }
     );
     
     // Verify .env.worktree creation
     expect(mockFs.writeFile).toHaveBeenCalledWith(
-      path.join('.worktrees', 'wt-feature-test', '.env.worktree'),
-      expect.stringMatching(/VITE_PORT=3000[\r\n]+STORYBOOK_PORT=6000[\r\n]+WORKTREE_NAME=wt-feature-test[\r\n]+/)
+      path.join('.worktrees', 'feature-test', '.env.worktree'),
+      expect.stringMatching(/VITE_PORT=3000[\r\n]+STORYBOOK_PORT=6000[\r\n]+WORKTREE_NAME=feature-test[\r\n]+/)
     );
     
     // Verify success messages
@@ -140,7 +140,7 @@ describe('create command', () => {
     
     // Verify worktree created from base branch
     expect(mockGitOps.createWorktree).toHaveBeenCalledWith(
-      path.join('.worktrees', 'wt-feature-test'),
+      path.join('.worktrees', 'feature-test'),
       'feature-test',
       'develop'
     );
@@ -148,7 +148,7 @@ describe('create command', () => {
 
   test('throws error when worktree already exists', async () => {
     mockGitOps.listWorktrees.mockResolvedValue([
-      { path: path.join('.worktrees', 'wt-feature-test'), branch: 'feature-test' }
+      { path: path.join('.worktrees', 'feature-test'), branch: 'feature-test' }
     ]);
     
     try {
@@ -159,7 +159,7 @@ describe('create command', () => {
     
     expect(mockConsole.error).toHaveBeenCalledWith(
       chalk.red('Error:'),
-      `Worktree already exists at ${path.join('.worktrees', 'wt-feature-test')}`
+      `A worktree already exists at ${path.join('.worktrees', 'feature-test')}. Use 'wt switch feature-test' to work in it, or 'wt remove feature-test' to delete it first`
     );
     expect(mockExit).toHaveBeenCalledWith(1);
   });
@@ -175,7 +175,7 @@ describe('create command', () => {
     
     expect(mockConsole.error).toHaveBeenCalledWith(
       chalk.red('Error:'),
-      'Base branch \'nonexistent\' does not exist'
+      'The branch \'nonexistent\' doesn\'t exist. Use \'git branch\' to see available branches, or omit the --from option to create from the current branch'
     );
     expect(mockExit).toHaveBeenCalledWith(1);
   });
@@ -187,13 +187,13 @@ describe('create command', () => {
     
     // Should read existing gitignore
     expect(mockFs.readFile).toHaveBeenCalledWith(
-      path.join('.worktrees', 'wt-feature-test', '.gitignore'),
+      path.join('.worktrees', 'feature-test', '.gitignore'),
       'utf8'
     );
     
     // Should append .env.worktree
     expect(mockFs.writeFile).toHaveBeenCalledWith(
-      path.join('.worktrees', 'wt-feature-test', '.gitignore'),
+      path.join('.worktrees', 'feature-test', '.gitignore'),
       expect.stringMatching(/node_modules[\r\n]+\.env\.worktree[\r\n]+/)
     );
   });
@@ -205,7 +205,7 @@ describe('create command', () => {
     
     // Should create new gitignore with .env.worktree
     expect(mockFs.writeFile).toHaveBeenCalledWith(
-      path.join('.worktrees', 'wt-feature-test', '.gitignore'),
+      path.join('.worktrees', 'feature-test', '.gitignore'),
       expect.stringMatching(/[\r\n]+\.env\.worktree[\r\n]+/)
     );
   });
@@ -220,7 +220,7 @@ describe('create command', () => {
     
     // Should show warning but not fail
     expect(mockConsole.log).toHaveBeenCalledWith(
-      expect.stringContaining('⚠ Could not update .gitignore')
+      expect.stringContaining('⚠ Could not automatically add .env.worktree to .gitignore')
     );
     
     // Should still complete successfully
@@ -234,7 +234,7 @@ describe('create command', () => {
     
     // Should show cd command
     expect(mockConsole.log).toHaveBeenCalledWith(
-      chalk.gray(`  cd ${path.join('.worktrees', 'wt-feature-test')}`)
+      chalk.gray(`  cd ${path.join('.worktrees', 'feature-test')}`)
     );
     
     // Should show dev server commands with ports
@@ -314,5 +314,32 @@ describe('create command', () => {
       'Disk full'
     );
     expect(mockExit).toHaveBeenCalledWith(1);
+  });
+
+  test('creates worktree with name matching branch name (no wt- prefix)', async () => {
+    await createCommand('blah', { from: 'master' });
+    
+    // Verify that getWorktreeName was called with the branch name
+    expect(mockConfig.getWorktreeName).toHaveBeenCalledWith('blah');
+    
+    // Verify worktree was created with 'blah' as the name, not 'wt-blah'
+    expect(mockGitOps.createWorktree).toHaveBeenCalledWith(
+      path.join('.worktrees', 'blah'),
+      'blah',
+      'master'
+    );
+    
+    // Verify port assignment uses 'blah' as the worktree name
+    expect(mockPortManager.assignPorts).toHaveBeenCalledWith(
+      'blah',
+      ['vite', 'storybook'],
+      { vite: { start: 3000, end: 3099 }, storybook: { start: 6000, end: 6099 } }
+    );
+    
+    // Verify .env.worktree contains the correct worktree name
+    expect(mockFs.writeFile).toHaveBeenCalledWith(
+      path.join('.worktrees', 'blah', '.env.worktree'),
+      expect.stringMatching(/WORKTREE_NAME=blah/)
+    );
   });
 });

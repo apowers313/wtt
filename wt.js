@@ -9,6 +9,7 @@ const { switchCommand } = require('./commands/switch');
 const { mergeCommand } = require('./commands/merge');
 const { removeCommand } = require('./commands/remove');
 const { portsCommand } = require('./commands/ports');
+const { addCommandContext } = require('./lib/errorTranslator');
 
 const program = new Command();
 
@@ -30,7 +31,12 @@ program
         console.log(chalk.green('✓ Initialized worktree configuration'));
       }
     } catch (error) {
-      console.error(chalk.red('Error initializing configuration:'), error.message);
+      console.error(chalk.red('Error:'), error.message);
+      const context = addCommandContext(error.message, 'init');
+      if (context.tips && context.tips.length > 0) {
+        console.error(chalk.yellow('\nTips:'));
+        context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
+      }
       process.exit(1);
     }
   });
@@ -49,13 +55,15 @@ program
 
 program
   .command('switch <worktree-name>')
-  .description('Switch to a worktree directory and show port information')
+  .description('Switch to a worktree directory by spawning a new shell')
+  .option('--no-shell', 'Just show information without spawning a shell')
   .action(switchCommand);
 
 program
   .command('merge <worktree-name>')
   .description('Merge worktree branch to main and optionally clean up')
   .option('-d, --delete', 'Delete worktree and branch after merge')
+  .option('--no-delete', 'Prevent deletion even if autoCleanup is enabled')
   .action(mergeCommand);
 
 program

@@ -6,6 +6,7 @@ const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const PathUtils = require('../lib/pathUtils');
+const { addCommandContext } = require('../lib/errorTranslator');
 
 async function createCommand(branchName, options) {
   try {
@@ -20,14 +21,14 @@ async function createCommand(branchName, options) {
     const worktrees = await gitOps.listWorktrees();
     const existingWorktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
     if (existingWorktree) {
-      throw new Error(`Worktree already exists at ${worktreePath}`);
+      throw new Error(`A worktree already exists at ${worktreePath}. Use 'wt switch ${worktreeName}' to work in it, or 'wt remove ${worktreeName}' to delete it first`);
     }
     
     const baseBranch = options.from || null;
     if (baseBranch) {
       const branchExists = await gitOps.checkBranchExists(baseBranch);
       if (!branchExists) {
-        throw new Error(`Base branch '${baseBranch}' does not exist`);
+        throw new Error(`The branch '${baseBranch}' doesn't exist. Use 'git branch' to see available branches, or omit the --from option to create from the current branch`);
       }
     }
     
@@ -70,7 +71,7 @@ async function createCommand(branchName, options) {
         console.log('✓ Added .env.worktree to .gitignore');
       }
     } catch (error) {
-      console.log(`⚠ Could not update .gitignore: ${error.message}`);
+      console.log(chalk.yellow('⚠ Could not automatically add .env.worktree to .gitignore'));
     }
     
     
@@ -93,6 +94,11 @@ async function createCommand(branchName, options) {
     
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
+    const context = addCommandContext(error.message, 'create');
+    if (context.tips && context.tips.length > 0) {
+      console.error(chalk.yellow('\nTips:'));
+      context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
+    }
     process.exit(1);
   }
 }

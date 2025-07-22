@@ -1,3 +1,10 @@
 {
-  "mainBranch": "develop"
+  "mainBranch": "develop",
+  "prompts": {
+    "bash": "{purple}⚡{green}{worktree}{purple}{dirty} {cyan}{cwd} {blue}▶{reset} ",
+    "zsh": "%F{magenta}⚡%f%F{green}{worktree}%f%F{magenta}{dirty}%f %F{cyan}{cwd}%f %F{blue}▶%f ",
+    "fish": "{magenta}⚡{green}{worktree}{magenta}{dirty} {cyan}{cwd} {blue}▶ {normal}",
+    "powershell": "{magenta}⚡{green}{worktree}{magenta}{dirty} {cyan}{cwd} {blue}▶ ",
+    "default": "[{worktree}]> "
+  }
 }

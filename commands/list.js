@@ -3,6 +3,7 @@ const path = require('path');
 const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
+const { addCommandContext } = require('../lib/errorTranslator');
 
 async function listCommand(options) {
   try {
@@ -97,6 +98,11 @@ async function listCommand(options) {
     
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
+    const context = addCommandContext(error.message, 'list');
+    if (context.tips && context.tips.length > 0) {
+      console.error(chalk.yellow('\nTips:'));
+      context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
+    }
     process.exit(1);
   }
 }

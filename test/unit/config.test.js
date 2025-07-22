@@ -2,6 +2,7 @@ const config = require('../../lib/config');
 const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
+const { execSync } = require('child_process');
 
 describe('Config module (integration)', () => {
   let tempDir;
@@ -17,9 +18,15 @@ describe('Config module (integration)', () => {
     tempDir = await fs.realpath(tempDir);
     process.chdir(tempDir);
     
+    // Initialize git repository
+    execSync('git init', { cwd: tempDir, stdio: 'ignore' });
+    execSync('git config user.email "test@example.com"', { cwd: tempDir, stdio: 'ignore' });
+    execSync('git config user.name "Test User"', { cwd: tempDir, stdio: 'ignore' });
+    
     // Reset config state
     config.config = null;
     config.configPath = null;
+    config.mainRoot = null;
   });
   
   afterEach(async () => {
@@ -49,7 +56,7 @@ describe('Config module (integration)', () => {
 
   describe('load', () => {
     test('throws when config file does not exist', async () => {
-      await expect(config.load()).rejects.toThrow('Configuration not found. Run "wt init" first.');
+      await expect(config.load()).rejects.toThrow('No worktree configuration found in this repository. Please run "wt init" to set up the worktree tool');
     });
 
     test('loads and returns config when file exists', async () => {
@@ -61,15 +68,43 @@ describe('Config module (integration)', () => {
           custom: { start: 8000, increment: 10 }
         },
         mainBranch: 'main',
-        namePattern: 'wt-{branch}'
+        namePattern: '{branch}'
       };
       
       await fs.writeJSON('.worktree-config.json', mockConfig);
       
       const result = await config.load();
       
-      expect(result).toEqual(mockConfig);
-      expect(config.config).toEqual(mockConfig);
+      // Should include defaults merged with loaded config
+      expect(result).toMatchObject(mockConfig);
+      expect(result.autoCleanup).toBe(true); // From defaults
+      expect(result.prompts).toBeDefined(); // From defaults
+      expect(config.config).toEqual(result);
+    });
+
+    test('merges partial config with defaults', async () => {
+      // Write a config file with only mainBranch (missing namePattern)
+      const partialConfig = {
+        mainBranch: 'develop'
+      };
+      
+      await fs.writeJSON('.worktree-config.json', partialConfig);
+      
+      const result = await config.load();
+      
+      // Should have default values for missing fields
+      expect(result).toMatchObject({
+        baseDir: '.worktrees',
+        portRanges: {
+          vite: { start: 3000, increment: 10 },
+          storybook: { start: 6006, increment: 10 },
+          custom: { start: 8000, increment: 10 }
+        },
+        mainBranch: 'develop', // From file
+        namePattern: '{branch}', // From defaults
+        autoCleanup: true
+      });
+      expect(config.config).toEqual(result);
     });
 
     test('throws on invalid JSON', async () => {
@@ -91,7 +126,7 @@ describe('Config module (integration)', () => {
           custom: { start: 8000, increment: 10 }
         },
         mainBranch: 'main',
-        namePattern: 'wt-{branch}'
+        namePattern: '{branch}'
       });
       
       // Verify file was created
@@ -107,14 +142,17 @@ describe('Config module (integration)', () => {
         baseDir: 'custom-worktrees',
         mainBranch: 'develop',
         portRanges: { vite: { start: 3000, increment: 10 } },
-        namePattern: 'wt-{branch}'
+        namePattern: '{branch}'
       };
       
       await fs.writeJSON('.worktree-config.json', existingConfig);
       
       const result = await config.init();
       
-      expect(result).toEqual(existingConfig);
+      // Should include defaults merged with existing config
+      expect(result).toMatchObject(existingConfig);
+      expect(result.autoCleanup).toBe(true); // From defaults
+      expect(result.prompts).toBeDefined(); // From defaults
     });
   });
 
@@ -136,7 +174,7 @@ describe('Config module (integration)', () => {
     test('throws when config not loaded', async () => {
       config.config = null;
       
-      await expect(config.save()).rejects.toThrow('Configuration not loaded');
+      await expect(config.save()).rejects.toThrow('Configuration hasn\'t been loaded yet');
     });
   });
 
@@ -151,7 +189,7 @@ describe('Config module (integration)', () => {
           custom: { start: 8000, increment: 10 }
         },
         mainBranch: 'main',
-        namePattern: 'wt-{branch}'
+        namePattern: '{branch}'
       });
       
       await config.load();
@@ -166,7 +204,7 @@ describe('Config module (integration)', () => {
     test('throws when config not loaded', () => {
       config.config = null;
       
-      expect(() => config.get()).toThrow('Configuration not loaded');
+      expect(() => config.get()).toThrow('Configuration hasn\'t been loaded yet');
     });
   });
 
@@ -176,7 +214,7 @@ describe('Config module (integration)', () => {
       
       const name = config.getWorktreeName('feature-auth-system');
       
-      expect(name).toBe('wt-feature-auth-system');
+      expect(name).toBe('feature-auth-system');
     });
 
     test('handles branch names with slashes', async () => {
@@ -184,13 +222,27 @@ describe('Config module (integration)', () => {
       
       const name = config.getWorktreeName('feature/auth-system');
       
-      expect(name).toBe('wt-feature/auth-system');
+      expect(name).toBe('feature/auth-system');
+    });
+
+    test('uses default namePattern when missing from config file', async () => {
+      // This is the exact scenario the user encountered
+      await fs.writeJSON('.worktree-config.json', {
+        mainBranch: 'develop'
+        // namePattern is missing!
+      });
+      
+      await config.load();
+      const name = config.getWorktreeName('ugh');
+      
+      // Should use the default pattern '{branch}', not 'wt-{branch}'
+      expect(name).toBe('ugh');
     });
 
     test('throws when config not loaded', () => {
       config.config = null;
       
-      expect(() => config.getWorktreeName('feature')).toThrow('Configuration not loaded');
+      expect(() => config.getWorktreeName('feature')).toThrow('Configuration hasn\'t been loaded yet');
     });
   });
 
@@ -198,23 +250,23 @@ describe('Config module (integration)', () => {
     test('returns correct worktree path', async () => {
       await config.init();
       
-      const result = config.getWorktreePath('wt-feature', tempDir);
+      const result = config.getWorktreePath('feature', tempDir);
       
-      expect(result).toBe(path.join(tempDir, '.worktrees', 'wt-feature'));
+      expect(result).toBe(path.join(tempDir, '.worktrees', 'feature'));
     });
 
     test('uses current directory as default', async () => {
       await config.init();
       
-      const result = config.getWorktreePath('wt-feature');
+      const result = config.getWorktreePath('feature');
       
-      expect(result).toBe(path.join(tempDir, '.worktrees', 'wt-feature'));
+      expect(result).toBe(path.join(tempDir, '.worktrees', 'feature'));
     });
 
     test('throws when config not loaded', () => {
       config.config = null;
       
-      expect(() => config.getWorktreePath('wt-feature')).toThrow('Configuration not loaded');
+      expect(() => config.getWorktreePath('feature')).toThrow('Configuration hasn\'t been loaded yet');
     });
   });
 
@@ -238,7 +290,7 @@ describe('Config module (integration)', () => {
     test('throws when config not loaded', () => {
       config.config = null;
       
-      expect(() => config.getBaseDir()).toThrow('Configuration not loaded');
+      expect(() => config.getBaseDir()).toThrow('Configuration hasn\'t been loaded yet');
     });
   });
 });
