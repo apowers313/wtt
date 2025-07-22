@@ -32,7 +32,7 @@ describe('wt remove command (simplified)', () => {
     const result = await repo.run('remove wt-nonexistent --force');
     
     helpers.expectFailure(result);
-    helpers.expectOutputContains(result, ['not found', 'does not exist']);
+    helpers.expectOutputContains(result, ['not found', 'does not exist', 'doesn\'t exist']);
   });
 
   test('removes worktree with uncommitted changes when forced', async () => {

@@ -238,8 +238,8 @@ class WorktreeTestHelpers {
    * Check if worktree exists with retries for timing issues
    */
   async expectWorktreeExists(branch, shouldExist = true) {
-    // With current config using {branch} pattern, worktree name is just the branch name
-    const name = branch;
+    // With default config using wt-{branch} pattern
+    const name = `wt-${branch}`;
     const worktreePath = path.join('.worktrees', name);
     
     
@@ -262,8 +262,8 @@ class WorktreeTestHelpers {
    */
   async expectWorktreeStatus(branch, expectedStatus) {
     const result = await this.repo.run('list -v');
-    // With current config using {branch} pattern, worktree name is just the branch name
-    const name = branch;
+    // With default config using wt-{branch} pattern
+    const name = `wt-${branch}`;
     
     const statusAliases = {
       'clean': ['clean', 'Clean', 'up to date', ''],
@@ -287,8 +287,8 @@ class WorktreeTestHelpers {
    * Check if ports are assigned
    */
   async expectPortsAssigned(branch, services) {
-    // With current config using {branch} pattern, worktree name is just the branch name
-    const name = branch;
+    // With default config using wt-{branch} pattern
+    const name = `wt-${branch}`;
     const portMapPath = path.join('.worktrees', '.port-map.json');
     
     
@@ -323,8 +323,8 @@ class WorktreeTestHelpers {
    * Check environment file
    */
   async expectEnvFile(branch, variables) {
-    // With current config using {branch} pattern, worktree name is just the branch name
-    const name = branch;
+    // With default config using wt-{branch} pattern
+    const name = `wt-${branch}`;
     const envPath = path.join('.worktrees', name, '.env.worktree');
     
     const content = await this.repo.readFile(envPath);
@@ -343,8 +343,8 @@ class WorktreeTestHelpers {
    * Get worktree name with prefix
    */
   getWorktreeName(branch) {
-    // With current config using {branch} pattern, worktree name is just the branch name
-    return branch;
+    // With default config using wt-{branch} pattern
+    return `wt-${branch}`;
   }
 
   /**

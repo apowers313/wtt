@@ -232,7 +232,7 @@ describe('GitOps module (integration)', () => {
         // Reinitialize gitOps in the non-git directory
         gitOps.git = simpleGit(nonGitDir);
         
-        await expect(gitOps.validateRepository()).rejects.toThrow('Not in a git repository');
+        await expect(gitOps.validateRepository()).rejects.toThrow('This command must be run inside a git repository');
       } finally {
         // Clean up
         process.chdir(repo.dir);

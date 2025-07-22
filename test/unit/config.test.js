@@ -68,7 +68,7 @@ describe('Config module (integration)', () => {
           custom: { start: 8000, increment: 10 }
         },
         mainBranch: 'main',
-        namePattern: '{branch}'
+        namePattern: 'wt-{branch}'
       };
       
       await fs.writeJSON('.worktree-config.json', mockConfig);
@@ -101,7 +101,7 @@ describe('Config module (integration)', () => {
           custom: { start: 8000, increment: 10 }
         },
         mainBranch: 'develop', // From file
-        namePattern: '{branch}', // From defaults
+        namePattern: 'wt-{branch}', // From defaults
         autoCleanup: true
       });
       expect(config.config).toEqual(result);
@@ -126,7 +126,7 @@ describe('Config module (integration)', () => {
           custom: { start: 8000, increment: 10 }
         },
         mainBranch: 'main',
-        namePattern: '{branch}'
+        namePattern: 'wt-{branch}'
       });
       
       // Verify file was created
@@ -142,7 +142,7 @@ describe('Config module (integration)', () => {
         baseDir: 'custom-worktrees',
         mainBranch: 'develop',
         portRanges: { vite: { start: 3000, increment: 10 } },
-        namePattern: '{branch}'
+        namePattern: 'wt-{branch}'
       };
       
       await fs.writeJSON('.worktree-config.json', existingConfig);
@@ -189,7 +189,7 @@ describe('Config module (integration)', () => {
           custom: { start: 8000, increment: 10 }
         },
         mainBranch: 'main',
-        namePattern: '{branch}'
+        namePattern: 'wt-{branch}'
       });
       
       await config.load();
@@ -214,7 +214,7 @@ describe('Config module (integration)', () => {
       
       const name = config.getWorktreeName('feature-auth-system');
       
-      expect(name).toBe('feature-auth-system');
+      expect(name).toBe('wt-feature-auth-system');
     });
 
     test('handles branch names with slashes', async () => {
@@ -222,7 +222,7 @@ describe('Config module (integration)', () => {
       
       const name = config.getWorktreeName('feature/auth-system');
       
-      expect(name).toBe('feature/auth-system');
+      expect(name).toBe('wt-feature/auth-system');
     });
 
     test('uses default namePattern when missing from config file', async () => {
@@ -235,8 +235,8 @@ describe('Config module (integration)', () => {
       await config.load();
       const name = config.getWorktreeName('ugh');
       
-      // Should use the default pattern '{branch}', not 'wt-{branch}'
-      expect(name).toBe('ugh');
+      // Should use the default pattern 'wt-{branch}'
+      expect(name).toBe('wt-ugh');
     });
 
     test('throws when config not loaded', () => {

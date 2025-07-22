@@ -273,7 +273,7 @@ describe('merge command', () => {
         autoCleanup: true
       });
 
-      await mergeCommand('wt-feature', { noDelete: true });
+      await mergeCommand('wt-feature', { delete: false });
 
       expect(gitOps.mergeBranch).toHaveBeenCalledWith('feature', 'main');
       expect(gitOps.removeWorktree).not.toHaveBeenCalled();

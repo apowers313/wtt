@@ -17,7 +17,7 @@ describe('wt switch command', () => {
   test('provides cd command for switching to worktree', async () => {
     await repo.run('create feature-test --from main');
     
-    const result = await repo.run('switch wt-feature-test');
+    const result = await repo.run('switch wt-feature-test --no-shell');
     
     if (process.env.CI || process.env.DEBUG_TESTS) {
       console.log('\n[DEBUG] switch test:');
@@ -80,16 +80,16 @@ describe('wt switch command', () => {
   });
 
   test('fails when worktree not found', async () => {
-    const result = await repo.run('switch wt-nonexistent');
+    const result = await repo.run('switch wt-nonexistent --no-shell');
     
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain('not found');
+    expect(result.stderr).toContain('doesn\'t exist');
   });
 
   test('provides absolute path', async () => {
     await repo.run('create feature-test --from main');
     
-    const result = await repo.run('switch wt-feature-test');
+    const result = await repo.run('switch wt-feature-test --no-shell');
     
     const expectedPath = path.join(repo.dir, '.worktrees', 'wt-feature-test');
     

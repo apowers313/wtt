@@ -87,7 +87,8 @@ async function mergeCommand(worktreeName, options) {
     console.log(chalk.green(`✓ Merged '${branchName}'`));
     
     // Check if we should clean up based on config or explicit option
-    const shouldConsiderCleanup = options.delete || (cfg.autoCleanup && !options.noDelete);
+    // When --no-delete is passed, options.delete is explicitly false
+    const shouldConsiderCleanup = options.delete === true || (cfg.autoCleanup && options.delete !== false);
     
     if (shouldConsiderCleanup) {
       let confirmDelete = true;

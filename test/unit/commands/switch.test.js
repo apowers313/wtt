@@ -69,7 +69,7 @@ describe('switch command', () => {
     };
     fs.readFile = jest.fn().mockResolvedValue(JSON.stringify(mockPackageJson));
 
-    await switchCommand('wt-feature');
+    await switchCommand('wt-feature', { shell: false });
 
     expect(mockConsoleLog).toHaveBeenCalledWith('Switching to worktree \'wt-feature\'...');
     expect(mockConsoleLog).toHaveBeenCalledWith(`Path: ${worktreePath}`);
@@ -87,9 +87,9 @@ describe('switch command', () => {
   test('handles non-existent worktree', async () => {
     fs.access = jest.fn().mockRejectedValue(new Error('Not found'));
 
-    await switchCommand('wt-nonexistent');
+    await switchCommand('wt-nonexistent', { shell: false });
 
-    expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'Worktree \'wt-nonexistent\' not found');
+    expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'Worktree \'wt-nonexistent\' doesn\'t exist. Use \'wt list\' to see available worktrees, or \'wt create wt-nonexistent\' to create it');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 
@@ -97,7 +97,7 @@ describe('switch command', () => {
     portManager.getPorts = jest.fn().mockReturnValue(null);
     fs.readFile = jest.fn().mockRejectedValue(new Error('No package.json'));
 
-    await switchCommand('wt-no-ports');
+    await switchCommand('wt-no-ports', { shell: false });
 
     expect(mockConsoleLog).toHaveBeenCalledWith('Switching to worktree \'wt-no-ports\'...');
     expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('Assigned ports:'));
@@ -109,7 +109,7 @@ describe('switch command', () => {
     portManager.isPortInUse = jest.fn().mockResolvedValue(false);
     fs.readFile = jest.fn().mockRejectedValue(new Error('ENOENT'));
 
-    await switchCommand('wt-feature');
+    await switchCommand('wt-feature', { shell: false });
 
     expect(mockConsoleLog).toHaveBeenCalledWith('Switching to worktree \'wt-feature\'...');
     expect(mockConsoleLog).toHaveBeenCalledWith('\n' + 'Assigned ports:');
@@ -121,7 +121,7 @@ describe('switch command', () => {
     portManager.isPortInUse = jest.fn().mockResolvedValue(false);
     fs.readFile = jest.fn().mockResolvedValue('invalid json');
 
-    await switchCommand('wt-feature');
+    await switchCommand('wt-feature', { shell: false });
 
     expect(mockConsoleLog).toHaveBeenCalledWith('Switching to worktree \'wt-feature\'...');
     expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('Available npm scripts:'));
@@ -132,7 +132,7 @@ describe('switch command', () => {
     portManager.getPorts = jest.fn().mockReturnValue(null);
     fs.readFile = jest.fn().mockRejectedValue(new Error('No package.json'));
 
-    await switchCommand('wt-feature');
+    await switchCommand('wt-feature', { shell: false });
 
     expect(mockConsoleLog).toHaveBeenCalledWith('\n' + 'Note: This command cannot change your current directory.');
     expect(mockConsoleLog).toHaveBeenCalledWith('You need to manually run the cd command shown above.');
@@ -147,7 +147,7 @@ describe('switch command', () => {
     portManager.isPortInUse = jest.fn().mockResolvedValue(false);
     fs.readFile = jest.fn().mockRejectedValue(new Error('No package.json'));
 
-    await switchCommand('wt-feature');
+    await switchCommand('wt-feature', { shell: false });
 
     expect(mockConsoleLog).toHaveBeenCalledWith(`Path: ${worktreePath}`);
     expect(mockConsoleLog).toHaveBeenCalledWith(`  cd ${worktreePath}`);
@@ -167,7 +167,7 @@ describe('switch command', () => {
       .mockResolvedValueOnce(true);  // custom running
     fs.readFile = jest.fn().mockRejectedValue(new Error('No package.json'));
 
-    await switchCommand('wt-feature');
+    await switchCommand('wt-feature', { shell: false });
 
     expect(mockConsoleLog).toHaveBeenCalledWith('  vite: 3000 (running)');
     expect(mockConsoleLog).toHaveBeenCalledWith('  storybook: 6006');
@@ -178,7 +178,7 @@ describe('switch command', () => {
     const error = new Error('Repository validation failed');
     gitOps.validateRepository = jest.fn().mockRejectedValue(error);
 
-    await switchCommand('wt-feature');
+    await switchCommand('wt-feature', { shell: false });
 
     expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'Repository validation failed');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
@@ -195,7 +195,7 @@ describe('switch command', () => {
     };
     fs.readFile = jest.fn().mockResolvedValue(JSON.stringify(mockPackageJson));
 
-    await switchCommand('wt-feature');
+    await switchCommand('wt-feature', { shell: false });
 
     expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('Available npm scripts:'));
   });

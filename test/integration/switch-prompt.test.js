@@ -45,7 +45,7 @@ describe('Switch Command Shell Prompts', () => {
 
   describe('Environment variables', () => {
     it('should set WT_WORKTREE and WT_WORKTREE_PATH environment variables', (done) => {
-      const switchProcess = spawn('node', [wtPath, 'switch', 'test-feature'], {
+      const switchProcess = spawn('node', [wtPath, 'switch', 'wt-test-feature'], {
         cwd: repoDir,
         env: { ...process.env, SHELL: '/bin/bash' }
       });
@@ -63,8 +63,8 @@ describe('Switch Command Shell Prompts', () => {
       }, 500);
 
       switchProcess.on('close', () => {
-        expect(output).to.include('WT_WORKTREE=test-feature');
-        expect(output).to.include(`WT_WORKTREE_PATH=${path.join(repoDir, '.worktrees', 'test-feature')}`);
+        expect(output).to.include('WT_WORKTREE=wt-test-feature');
+        expect(output).to.include(`WT_WORKTREE_PATH=${path.join(repoDir, '.worktrees', 'wt-test-feature')}`);
         done();
       });
     });
@@ -86,7 +86,7 @@ describe('Switch Command Shell Prompts', () => {
       // For now, just verify that custom prompts are loaded from config
       // Interactive shell testing is too complex for automated tests
       
-      const output = execSync(`node ${wtPath} switch test-feature --no-shell`, {
+      const output = execSync(`node ${wtPath} switch wt-test-feature --no-shell`, {
         cwd: repoDir
       }).toString();
       
@@ -95,7 +95,7 @@ describe('Switch Command Shell Prompts', () => {
     });
 
     it('should use default prompt for unknown shell', (done) => {
-      const switchProcess = spawn('node', [wtPath, 'switch', 'test-feature'], {
+      const switchProcess = spawn('node', [wtPath, 'switch', 'wt-test-feature'], {
         cwd: repoDir,
         env: { ...process.env, SHELL: '/bin/unknown-shell' }
       });
@@ -120,14 +120,14 @@ describe('Switch Command Shell Prompts', () => {
 
   describe('--no-shell option', () => {
     it('should not spawn shell with --no-shell flag', () => {
-      const output = execSync(`node ${wtPath} switch test-feature --no-shell`, {
+      const output = execSync(`node ${wtPath} switch wt-test-feature --no-shell`, {
         cwd: repoDir
       }).toString();
 
       expect(output).to.include('Switching to worktree');
-      expect(output).to.include('test-feature');
+      expect(output).to.include('wt-test-feature');
       expect(output).to.include('cd ');
-      expect(output).to.include('.worktrees/test-feature');
+      expect(output).to.include('.worktrees/wt-test-feature');
       expect(output).not.to.include('Spawning shell');
     });
   });
@@ -135,7 +135,7 @@ describe('Switch Command Shell Prompts', () => {
   describe('Prompt template variables', () => {
     beforeEach(async () => {
       // Create a worktree with uncommitted changes
-      const worktreePath = path.join(repoDir, '.worktrees', 'test-feature');
+      const worktreePath = path.join(repoDir, '.worktrees', 'wt-test-feature');
       const testFile = path.join(worktreePath, 'test.txt');
       await fs.writeFile(testFile, 'test content');
       
@@ -161,7 +161,7 @@ describe('Switch Command Shell Prompts', () => {
 
   describe('Shell type detection', () => {
     it('should detect bash shell', () => {
-      const output = execSync(`SHELL=/bin/bash node ${wtPath} switch test-feature --no-shell`, {
+      const output = execSync(`SHELL=/bin/bash node ${wtPath} switch wt-test-feature --no-shell`, {
         cwd: repoDir,
         env: { ...process.env, SHELL: '/bin/bash' }
       }).toString();
@@ -170,7 +170,7 @@ describe('Switch Command Shell Prompts', () => {
     });
 
     it('should detect zsh shell', () => {
-      const output = execSync(`SHELL=/usr/bin/zsh node ${wtPath} switch test-feature --no-shell`, {
+      const output = execSync(`SHELL=/usr/bin/zsh node ${wtPath} switch wt-test-feature --no-shell`, {
         cwd: repoDir,
         env: { ...process.env, SHELL: '/usr/bin/zsh' }
       }).toString();
@@ -179,7 +179,7 @@ describe('Switch Command Shell Prompts', () => {
     });
 
     it('should handle Windows PowerShell', () => {
-      const output = execSync(`node ${wtPath} switch test-feature --no-shell`, {
+      const output = execSync(`node ${wtPath} switch wt-test-feature --no-shell`, {
         cwd: repoDir,
         env: { ...process.env, SHELL: undefined, COMSPEC: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' }
       }).toString();
@@ -208,7 +208,7 @@ describe('Switch Command Shell Prompts', () => {
       await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
       // Should still work, just ignore invalid variables
-      const switchProcess = spawn('node', [wtPath, 'switch', 'test-feature'], {
+      const switchProcess = spawn('node', [wtPath, 'switch', 'wt-test-feature'], {
         cwd: repoDir,
         env: { ...process.env, SHELL: '/bin/bash' }
       });

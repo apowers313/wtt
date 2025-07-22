@@ -23,7 +23,7 @@ describe('Error recovery scenarios', () => {
     // Simulate partial worktree creation - create git worktree but not our tracking
     await repo.git('checkout -b broken-branch');
     await repo.git('checkout main');
-    await repo.git(`worktree add ${path.join('.worktrees', 'broken')} broken-branch`);
+    await repo.git(`worktree add ${path.join('.worktrees', 'wt-broken')} broken-branch`);
     
     // Try to create same worktree again through our tool
     const result = await helpers.createWorktree('broken');
@@ -36,7 +36,7 @@ describe('Error recovery scenarios', () => {
       InteractiveTestHelpers.mockInquirer({ confirmFinal: true })
     );
     
-    const removeResult = await repo.run('remove broken --force');
+    const removeResult = await repo.run('remove wt-broken --force');
     helpers.expectSuccess(removeResult);
   });
 
@@ -83,7 +83,7 @@ describe('Error recovery scenarios', () => {
     
     // Get assigned ports
     const portMap1 = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    const vitePort1 = portMap1['feature-1'].vite;
+    const vitePort1 = portMap1['wt-feature-1'].vite;
     
     // Manually add fake entry with same port
     portMap1['fake'] = {
@@ -100,7 +100,7 @@ describe('Error recovery scenarios', () => {
     
     // Verify unique port assigned
     const finalPortMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    expect(finalPortMap['feature-2'].vite).not.toBe(vitePort1);
+    expect(finalPortMap['wt-feature-2'].vite).not.toBe(vitePort1);
   });
 
   test('recovers from git worktree inconsistency', async () => {
@@ -108,10 +108,10 @@ describe('Error recovery scenarios', () => {
     await helpers.createWorktree('feature-test');
     
     // Manually remove git worktree but leave our tracking
-    await repo.git(`worktree remove ${path.join('.worktrees', 'feature-test')} --force`);
+    await repo.git(`worktree remove ${path.join('.worktrees', 'wt-feature-test')} --force`);
     
     // Try to remove via wt command
-    const result = await repo.run('remove feature-test --force');
+    const result = await repo.run('remove wt-feature-test --force');
     
     // Should handle gracefully
     helpers.expectSuccess(result);
@@ -119,7 +119,7 @@ describe('Error recovery scenarios', () => {
     // Verify cleanup
     await AsyncTestHelpers.retry(async () => {
       const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-      expect(portMap['feature-test']).toBeUndefined();
+      expect(portMap['wt-feature-test']).toBeUndefined();
     });
   });
 
@@ -175,11 +175,11 @@ describe('Error recovery scenarios', () => {
     await helpers.createWorktree('cleanup-test');
     
     // Simulate a failed operation by corrupting the worktree
-    const worktreePath = path.join('.worktrees', 'cleanup-test');
+    const worktreePath = path.join('.worktrees', 'wt-cleanup-test');
     await repo.writeFile(`${worktreePath}/.git`, 'corrupted');
     
     // Try to remove - should handle corrupted state
-    const result = await repo.run('remove cleanup-test --force');
+    const result = await repo.run('remove wt-cleanup-test --force');
     
     // Should succeed or give clear error
     if (result.exitCode === 0) {

@@ -27,7 +27,7 @@ describe('wt remove command (fixed)', () => {
     await repo.writeFile(path.join(worktreePath, 'uncommitted.js'), 'export const test = 1;');
     
     // Force remove bypasses all prompts
-    const result = await repo.run('remove feature-test --force');
+    const result = await repo.run('remove wt-feature-test --force');
     
     helpers.expectSuccess(result);
     helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree', 'Cleaned up worktree directory']);
@@ -39,14 +39,14 @@ describe('wt remove command (fixed)', () => {
     
     // Verify ports released
     const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    expect(portMap['feature-test']).toBeUndefined();
+    expect(portMap['wt-feature-test']).toBeUndefined();
   });
 
   test('fails when worktree does not exist', async () => {
     const result = await repo.run('remove nonexistent');
     
     helpers.expectFailure(result);
-    helpers.expectOutputContains(result, ['not found', 'does not exist']);
+    helpers.expectOutputContains(result, ['not found', 'does not exist', 'doesn\'t exist']);
   });
 
   test('handles broken worktree gracefully', async () => {
@@ -54,17 +54,17 @@ describe('wt remove command (fixed)', () => {
     await helpers.createWorktree('feature-test');
     
     // Manually remove worktree directory (simulating corruption)
-    await fsExtra.remove(path.join(repo.dir, '.worktrees', 'feature-test'));
+    await fsExtra.remove(path.join(repo.dir, '.worktrees', 'wt-feature-test'));
     
     // Try to remove with --force
-    const result = await repo.run('remove feature-test --force');
+    const result = await repo.run('remove wt-feature-test --force');
     
     helpers.expectSuccess(result);
     helpers.expectOutputContains(result, ['removed', 'Removed', 'Cleaned up']);
     
     // Verify cleanup
     const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    expect(portMap['feature-test']).toBeUndefined();
+    expect(portMap['wt-feature-test']).toBeUndefined();
   });
 
   test('releases ports when removing worktree', async () => {
@@ -75,19 +75,19 @@ describe('wt remove command (fixed)', () => {
     expect(portsBefore.vite).toBeGreaterThanOrEqual(3000);
     
     // Remove with force
-    const result = await repo.run('remove feature-test --force');
+    const result = await repo.run('remove wt-feature-test --force');
     helpers.expectSuccess(result);
     helpers.expectOutputContains(result, 'Released ports');
     
     // Verify ports released
     const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    expect(portMap['feature-test']).toBeUndefined();
+    expect(portMap['wt-feature-test']).toBeUndefined();
   });
 
   test('shows note about branch after removal', async () => {
     await helpers.createWorktree('feature-test');
     
-    const result = await repo.run('remove feature-test --force');
+    const result = await repo.run('remove wt-feature-test --force');
     
     helpers.expectSuccess(result);
     helpers.expectOutputContains(result, ['branch', 'still exists', 'git branch -d']);

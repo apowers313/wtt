@@ -17,14 +17,14 @@ describe('wt merge command', () => {
     // Create worktree and make changes
     await helpers.createWorktree('feature-test');
     
-    await repo.inWorktree('feature-test', async () => {
+    await repo.inWorktree('wt-feature-test', async () => {
       await repo.writeFile('feature.js', 'export const feature = () => "test";');
       await repo.git('add .');
       await repo.git('commit -m "Add feature"');
     });
     
     // Merge
-    const result = await repo.run('merge feature-test');
+    const result = await repo.run('merge wt-feature-test');
     
     helpers.expectSuccess(result);
     helpers.expectOutputContains(result, ['merged', 'Merged']);
@@ -37,14 +37,14 @@ describe('wt merge command', () => {
     await helpers.createWorktree('feature-delete');
     
     // Add a file to the worktree
-    await repo.inWorktree('feature-delete', async () => {
+    await repo.inWorktree('wt-feature-delete', async () => {
       await repo.writeFile('delete-feature.js', 'export const deleteFeature = true;');
       await repo.git('add .');
       await repo.git('commit -m "Add delete feature"');
     });
     
     // Merge with delete flag (auto-confirmed in test environment)
-    const result = await repo.run('merge feature-delete --delete');
+    const result = await repo.run('merge wt-feature-delete --delete');
     helpers.expectSuccess(result);
     
     // Verify file is merged
@@ -57,21 +57,24 @@ describe('wt merge command', () => {
     
     // Verify ports are released
     const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    expect(portMap['feature-delete']).toBeUndefined();
+    expect(portMap['wt-feature-delete']).toBeUndefined();
   });
 
   test('merge without --delete flag preserves worktree', async () => {
     await helpers.createWorktree('feature-preserve');
     
     // Add a file to the worktree
-    await repo.inWorktree('feature-preserve', async () => {
+    await repo.inWorktree('wt-feature-preserve', async () => {
       await repo.writeFile('preserve-feature.js', 'export const preserveFeature = true;');
       await repo.git('add .');
       await repo.git('commit -m "Add preserve feature"');
     });
     
     // Merge without delete flag 
-    const result = await repo.run('merge feature-preserve');
+    const result = await repo.run('merge wt-feature-preserve --no-delete');
+    if (result.exitCode !== 0) {
+      console.log('Merge failed:', result.stdout, result.stderr);
+    }
     helpers.expectSuccess(result);
     
     // Verify file is merged
@@ -82,18 +85,18 @@ describe('wt merge command', () => {
     
     // Verify ports are still assigned
     const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    expect(portMap['feature-preserve']).toBeDefined();
+    expect(portMap['wt-feature-preserve']).toBeDefined();
   });
 
   test('fails when worktree has uncommitted changes', async () => {
     await helpers.createWorktree('feature-test');
     
     // Make uncommitted changes
-    await repo.inWorktree('feature-test', async () => {
+    await repo.inWorktree('wt-feature-test', async () => {
       await repo.writeFile('uncommitted.js', 'export const test = 1;');
     });
     
-    const result = await repo.run('merge feature-test');
+    const result = await repo.run('merge wt-feature-test');
     
     helpers.expectFailure(result);
     helpers.expectOutputContains(result, ['uncommitted changes', 'commit or stash']);
@@ -108,7 +111,7 @@ describe('wt merge command', () => {
     // Create worktree and modify file
     await helpers.createWorktree('feature-test');
     
-    await repo.inWorktree('feature-test', async () => {
+    await repo.inWorktree('wt-feature-test', async () => {
       await repo.writeFile('conflict.js', 'export const value = "feature";\n');
       await repo.git('add .');
       await repo.git('commit -m "Modify in feature"');
@@ -120,7 +123,7 @@ describe('wt merge command', () => {
     await repo.git('commit -m "Modify in main"');
     
     // Try to merge
-    const result = await repo.run('merge feature-test');
+    const result = await repo.run('merge wt-feature-test');
     
     helpers.expectFailure(result);
     helpers.expectOutputContains(result, ['conflict', 'CONFLICT']);

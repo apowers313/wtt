@@ -41,8 +41,8 @@ describe('Basic workflow test', () => {
     helpers.expectSuccess(listResult);
     helpers.expectOutputContains(listResult, 'wt-feature-workflow');
     
-    // Merge without --delete flag (it may not be implemented)
-    const mergeResult = await repo.run('merge wt-feature-workflow');
+    // Merge with --no-delete flag to prevent auto cleanup
+    const mergeResult = await repo.run('merge wt-feature-workflow --no-delete');
     helpers.expectSuccess(mergeResult);
     
     // Verify merge completed
