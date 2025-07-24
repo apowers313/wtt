@@ -1,5 +1,4 @@
 const panicCommand = require('../../../commands/panic');
-const chalk = require('chalk');
 const inquirer = require('inquirer');
 const BackupManager = require('../../../lib/merge-helper/backup-manager');
 const config = require('../../../lib/config');
