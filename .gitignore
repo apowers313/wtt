@@ -36,3 +36,5 @@ coverage/
 # Husky
 .husky/_
 .worktrees
+.worktree-config.json
+.worktrees/

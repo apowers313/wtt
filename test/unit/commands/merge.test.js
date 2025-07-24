@@ -5,6 +5,12 @@ const path = require('path');
 jest.mock('../../../lib/config');
 jest.mock('../../../lib/portManager');
 jest.mock('../../../lib/gitOps');
+jest.mock('../../../lib/merge-helper/message-formatter');
+jest.mock('../../../lib/merge-helper/backup-manager');
+jest.mock('../../../lib/merge-helper/conflict-detector');
+jest.mock('../../../lib/ui/progress-ui');
+jest.mock('../../../lib/currentWorktree');
+jest.mock('simple-git');
 jest.mock('inquirer', () => ({
   prompt: jest.fn()
 }));
@@ -13,13 +19,20 @@ jest.mock('chalk', () => ({
   green: jest.fn(msg => msg),
   yellow: jest.fn(msg => msg),
   blue: jest.fn(msg => msg),
-  gray: jest.fn(msg => msg)
+  gray: jest.fn(msg => msg),
+  cyan: jest.fn(msg => msg),
+  bold: jest.fn(msg => msg)
 }));
 
 const config = require('../../../lib/config');
 const portManager = require('../../../lib/portManager');
 const gitOps = require('../../../lib/gitOps');
 const inquirer = require('inquirer');
+const MessageFormatter = require('../../../lib/merge-helper/message-formatter');
+const BackupManager = require('../../../lib/merge-helper/backup-manager');
+const ConflictDetector = require('../../../lib/merge-helper/conflict-detector');
+const ProgressUI = require('../../../lib/ui/progress-ui');
+const simpleGit = require('simple-git');
 
 describe('merge command', () => {
   let mockConsoleLog;
@@ -34,6 +47,16 @@ describe('merge command', () => {
 
     // Default mocks
     gitOps.validateRepository = jest.fn().mockResolvedValue();
+    gitOps.hasUncommittedChanges = jest.fn().mockResolvedValue(false);
+    gitOps.status = jest.fn().mockResolvedValue({ conflicted: [] });
+    gitOps.listWorktrees = jest.fn().mockResolvedValue([]);
+    gitOps.getMainBranch = jest.fn().mockResolvedValue('main');
+    gitOps.git = {
+      cwd: jest.fn().mockResolvedValue(),
+      checkout: jest.fn().mockResolvedValue(),
+      merge: jest.fn().mockResolvedValue()
+    };
+    
     config.load = jest.fn().mockResolvedValue();
     config.get = jest.fn().mockReturnValue({
       mainBranch: 'main',
@@ -42,6 +65,45 @@ describe('merge command', () => {
     config.getBaseDir = jest.fn().mockReturnValue('/test/repo');
     config.getWorktreePath = jest.fn((name) => path.join('/test/repo', '.worktrees', name));
     portManager.init = jest.fn().mockResolvedValue();
+    
+    // Mock MessageFormatter
+    MessageFormatter.mockImplementation(() => ({
+      formatMergeError: jest.fn().mockReturnValue({
+        title: 'Error',
+        explanation: 'Test error',
+        options: []
+      }),
+      displayFormattedError: jest.fn()
+    }));
+    
+    // Mock BackupManager
+    BackupManager.mockImplementation(() => ({
+      createSafetyBackup: jest.fn().mockResolvedValue({
+        id: 'test-backup-123',
+        timestamp: new Date().toISOString()
+      }),
+      saveMergeState: jest.fn().mockResolvedValue()
+    }));
+    
+    // Mock ConflictDetector
+    ConflictDetector.mockImplementation(() => ({
+      predictConflicts: jest.fn().mockResolvedValue([])
+    }));
+    
+    // Mock ProgressUI
+    ProgressUI.displayMergeProgress = jest.fn().mockReturnValue({
+      updateSection: jest.fn(),
+      complete: jest.fn(),
+      fail: jest.fn()
+    });
+    
+    // Mock simple-git
+    const mockGit = {
+      status: jest.fn().mockResolvedValue({
+        files: []
+      })
+    };
+    simpleGit.mockReturnValue(mockGit);
   });
 
   afterEach(() => {
@@ -68,7 +130,6 @@ describe('merge command', () => {
     gitOps.checkBranchExists = jest.fn().mockResolvedValue(true);
     gitOps.getCurrentBranch = jest.fn().mockResolvedValue('main');
     gitOps.getMainBranch = jest.fn().mockResolvedValue('main');
-    gitOps.mergeBranch = jest.fn().mockResolvedValue();
     gitOps.removeWorktree = jest.fn().mockResolvedValue();
     gitOps.deleteBranch = jest.fn().mockResolvedValue();
     portManager.getPorts = jest.fn().mockReturnValue({ vite: 3000 });
@@ -77,7 +138,8 @@ describe('merge command', () => {
 
     await mergeCommand('wt-feature', { push: true, delete: true });
 
-    expect(gitOps.mergeBranch).toHaveBeenCalledWith('feature', 'main');
+    expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+    expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
     expect(mockConsoleLog).toHaveBeenCalledWith('✓ Switched to branch \'main\'');
     expect(mockConsoleLog).toHaveBeenCalledWith('✓ Merged \'feature\'');
     expect(gitOps.removeWorktree).toHaveBeenCalled();
@@ -87,6 +149,9 @@ describe('merge command', () => {
   });
 
   test('exits when worktree has uncommitted changes', async () => {
+    // Set simple error level for test
+    process.env.WTT_ERROR_LEVEL = 'simple';
+    
     const mockWorktrees = [
       { 
         path: path.join('/test/repo', '.worktrees', 'wt-feature'),
@@ -95,25 +160,40 @@ describe('merge command', () => {
     ];
 
     gitOps.listWorktrees = jest.fn().mockResolvedValue(mockWorktrees);
-    gitOps.hasUncommittedChanges = jest.fn().mockResolvedValue(true);
+    gitOps.hasUncommittedChanges = jest.fn()
+      .mockResolvedValueOnce(false)  // Main repo check
+      .mockResolvedValueOnce(true);   // Worktree check
 
     await mergeCommand('wt-feature', {});
 
+    expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Checking worktree \'wt-feature\''));
     expect(mockConsoleLog).toHaveBeenCalledWith('✗ Worktree has uncommitted changes');
     expect(mockConsoleLog).toHaveBeenCalledWith('Please commit or stash changes before merging');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
+    
+    // Clean up
+    delete process.env.WTT_ERROR_LEVEL;
   });
 
   test('handles non-existent worktree', async () => {
+    // Set simple error level for test
+    process.env.WTT_ERROR_LEVEL = 'simple';
+    
     gitOps.listWorktrees = jest.fn().mockResolvedValue([]);
 
     await mergeCommand('wt-nonexistent', {});
 
     expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'Worktree \'wt-nonexistent\' doesn\'t exist. Use \'wt list\' to see available worktrees');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
+    
+    // Clean up
+    delete process.env.WTT_ERROR_LEVEL;
   });
 
   test('handles merge conflicts', async () => {
+    // Set simple error level for test
+    process.env.WTT_ERROR_LEVEL = 'simple';
+    
     const mockWorktrees = [
       { 
         path: path.join('/test/repo', '.worktrees', 'wt-feature'),
@@ -128,12 +208,16 @@ describe('merge command', () => {
     gitOps.checkBranchExists = jest.fn().mockResolvedValue(true);
     gitOps.getCurrentBranch = jest.fn().mockResolvedValue('main');
     gitOps.getMainBranch = jest.fn().mockResolvedValue('main');
-    gitOps.mergeBranch = jest.fn().mockRejectedValue(new Error('CONFLICT'));
+    gitOps.git.merge = jest.fn().mockRejectedValue(new Error('CONFLICT'));
 
     await mergeCommand('wt-feature', {});
 
-    expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'CONFLICT');
+    expect(mockConsoleLog).toHaveBeenCalledWith('\n❌ Merge failed due to conflicts\n');
+    expect(mockConsoleLog).toHaveBeenCalledWith('The merge resulted in conflicts that need to be resolved.');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
+    
+    // Clean up
+    delete process.env.WTT_ERROR_LEVEL;
   });
 
   test('merges even when on feature branch', async () => {
@@ -151,14 +235,17 @@ describe('merge command', () => {
     gitOps.checkBranchExists = jest.fn().mockResolvedValue(true);
     gitOps.getCurrentBranch = jest.fn().mockResolvedValue('feature');
     gitOps.getMainBranch = jest.fn().mockResolvedValue('main');
-    gitOps.mergeBranch = jest.fn().mockResolvedValue();
 
     await mergeCommand('wt-feature', {});
 
-    expect(gitOps.mergeBranch).toHaveBeenCalledWith('feature', 'main');
+    expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+    expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
   });
 
   test('handles merge error', async () => {
+    // Set simple error level for test
+    process.env.WTT_ERROR_LEVEL = 'simple';
+    
     const mockWorktrees = [
       { 
         path: path.join('/test/repo', '.worktrees', 'wt-feature'),
@@ -170,12 +257,15 @@ describe('merge command', () => {
     gitOps.hasUncommittedChanges = jest.fn().mockResolvedValue(false);
     gitOps.hasUnpushedCommits = jest.fn().mockResolvedValue(false);
     gitOps.getMainBranch = jest.fn().mockResolvedValue('main');
-    gitOps.mergeBranch = jest.fn().mockRejectedValue(new Error('Branch not found'));
+    gitOps.git.merge = jest.fn().mockRejectedValue(new Error('Branch not found'));
 
     await mergeCommand('wt-feature', {});
 
     expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'Branch not found');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
+    
+    // Clean up
+    delete process.env.WTT_ERROR_LEVEL;
   });
 
 
@@ -195,11 +285,11 @@ describe('merge command', () => {
     gitOps.checkBranchExists = jest.fn().mockResolvedValue(true);
     gitOps.getCurrentBranch = jest.fn().mockResolvedValue('main');
     gitOps.getMainBranch = jest.fn().mockResolvedValue('main');
-    gitOps.mergeBranch = jest.fn().mockResolvedValue();
 
     await mergeCommand('wt-feature', {});
 
-    expect(gitOps.mergeBranch).toHaveBeenCalledWith('feature', 'main');
+    expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+    expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
   });
 
   describe('autoCleanup behavior', () => {
@@ -233,7 +323,8 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', {});
 
-      expect(gitOps.mergeBranch).toHaveBeenCalledWith('feature', 'main');
+      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
       expect(gitOps.removeWorktree).toHaveBeenCalled();
       expect(gitOps.deleteBranch).toHaveBeenCalledWith('feature');
       expect(portManager.releasePorts).toHaveBeenCalledWith('wt-feature');
@@ -247,7 +338,8 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', {});
 
-      expect(gitOps.mergeBranch).toHaveBeenCalledWith('feature', 'main');
+      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
       expect(gitOps.removeWorktree).not.toHaveBeenCalled();
       expect(gitOps.deleteBranch).not.toHaveBeenCalled();
       expect(portManager.releasePorts).not.toHaveBeenCalled();
@@ -261,7 +353,8 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', { delete: true });
 
-      expect(gitOps.mergeBranch).toHaveBeenCalledWith('feature', 'main');
+      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
       expect(gitOps.removeWorktree).toHaveBeenCalled();
       expect(gitOps.deleteBranch).toHaveBeenCalledWith('feature');
       expect(portManager.releasePorts).toHaveBeenCalledWith('wt-feature');
@@ -275,15 +368,17 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', { delete: false });
 
-      expect(gitOps.mergeBranch).toHaveBeenCalledWith('feature', 'main');
+      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
       expect(gitOps.removeWorktree).not.toHaveBeenCalled();
       expect(gitOps.deleteBranch).not.toHaveBeenCalled();
       expect(portManager.releasePorts).not.toHaveBeenCalled();
     });
 
     test('prompts user when autoCleanup is false in non-test environment', async () => {
-      // Remove test environment
-      delete process.env.NODE_ENV;
+      // Temporarily disable auto-confirm for this test
+      const originalAutoConfirm = process.env.WTT_AUTO_CONFIRM;
+      delete process.env.WTT_AUTO_CONFIRM;
       
       config.get = jest.fn().mockReturnValue({
         mainBranch: 'main',
@@ -294,6 +389,8 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', { delete: true });
 
+      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
       expect(inquirer.prompt).toHaveBeenCalledWith([{
         type: 'confirm',
         name: 'confirmDelete',
@@ -301,11 +398,15 @@ describe('merge command', () => {
         default: true
       }]);
       expect(gitOps.removeWorktree).toHaveBeenCalled();
+      
+      // Restore environment
+      process.env.WTT_AUTO_CONFIRM = originalAutoConfirm;
     });
 
     test('does not prompt when autoCleanup is true', async () => {
-      // Remove test environment
-      delete process.env.NODE_ENV;
+      // Temporarily disable auto-confirm for this test
+      const originalAutoConfirm = process.env.WTT_AUTO_CONFIRM;
+      delete process.env.WTT_AUTO_CONFIRM;
       
       config.get = jest.fn().mockReturnValue({
         mainBranch: 'main',
@@ -316,8 +417,13 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', {});
 
+      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
+      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
       expect(inquirer.prompt).not.toHaveBeenCalled();
       expect(gitOps.removeWorktree).toHaveBeenCalled();
+      
+      // Restore environment
+      process.env.WTT_AUTO_CONFIRM = originalAutoConfirm;
     });
   });
 

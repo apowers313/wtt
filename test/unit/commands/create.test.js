@@ -102,11 +102,12 @@ describe('create command', () => {
     // Verify config loaded
     expect(mockConfig.load).toHaveBeenCalled();
     
-    // Verify worktree creation
+    // Verify worktree creation (now defaults to main branch instead of null)
     expect(mockGitOps.createWorktree).toHaveBeenCalledWith(
       path.join('.worktrees', 'feature-test'),
       'feature-test',
-      null
+      'main',  // Now defaults to main branch
+      'main'   // mainBranch parameter
     );
     
     // Verify port assignment
@@ -142,7 +143,8 @@ describe('create command', () => {
     expect(mockGitOps.createWorktree).toHaveBeenCalledWith(
       path.join('.worktrees', 'feature-test'),
       'feature-test',
-      'develop'
+      'develop',
+      'main'   // mainBranch parameter
     );
   });
 
@@ -175,7 +177,7 @@ describe('create command', () => {
     
     expect(mockConsole.error).toHaveBeenCalledWith(
       chalk.red('Error:'),
-      'The branch \'nonexistent\' doesn\'t exist. Use \'git branch\' to see available branches, or omit the --from option to create from the current branch'
+      'The branch \'nonexistent\' doesn\'t exist. Use \'git branch\' to see available branches, or specify a different branch with --from'
     );
     expect(mockExit).toHaveBeenCalledWith(1);
   });
@@ -326,7 +328,8 @@ describe('create command', () => {
     expect(mockGitOps.createWorktree).toHaveBeenCalledWith(
       path.join('.worktrees', 'blah'),
       'blah',
-      'master'
+      'master',
+      'main'   // mainBranch parameter
     );
     
     // Verify port assignment uses 'blah' as the worktree name

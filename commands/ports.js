@@ -4,11 +4,20 @@ const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const { addCommandContext } = require('../lib/errorTranslator');
+const { getCurrentWorktree } = require('../lib/currentWorktree');
 
 async function portsCommand(worktreeName) {
   try {
     await gitOps.validateRepository();
     await config.load();
+    
+    // Auto-detect current worktree if no name provided (but don't require it since this command can show all)
+    if (!worktreeName) {
+      worktreeName = await getCurrentWorktree();
+      if (worktreeName) {
+        console.log(chalk.gray(`Auto-detected current worktree: ${worktreeName}`));
+      }
+    }
     
     const cfg = config.get();
     await portManager.init(config.getBaseDir());

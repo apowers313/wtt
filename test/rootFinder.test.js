@@ -8,8 +8,8 @@ describe('RootFinder', () => {
   let tempDir;
 
   beforeEach(async () => {
-    // Create a temporary directory for testing
-    tempDir = path.join(os.tmpdir(), `wtt-test-${Date.now()}`);
+    // Create a temporary directory for testing with random suffix
+    tempDir = path.join(os.tmpdir(), `wtt-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
     await fs.mkdir(tempDir, { recursive: true });
   });
 
@@ -248,7 +248,8 @@ describe('RootFinder', () => {
     it('should return null when config file not found', async () => {
       const dirPath = path.join(tempDir, 'no-config');
       await fs.mkdir(dirPath, { recursive: true });
-
+      
+      // Ensure no config file exists in the path or any parent
       const result = await rootFinder.findConfigFile(dirPath);
       
       expect(result).to.be.null;

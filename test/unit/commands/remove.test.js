@@ -199,7 +199,9 @@ describe('remove command', () => {
   });
 
   test('prompts for final confirmation in non-test environment', async () => {
-    delete process.env.NODE_ENV;
+    // Temporarily disable auto-confirm for this test
+    const originalAutoConfirm = process.env.WTT_AUTO_CONFIRM;
+    delete process.env.WTT_AUTO_CONFIRM;
     
     const mockWorktrees = [
       { 
@@ -222,6 +224,9 @@ describe('remove command', () => {
       })
     ]));
     expect(gitOps.removeWorktree).not.toHaveBeenCalled();
+    
+    // Restore environment
+    process.env.WTT_AUTO_CONFIRM = originalAutoConfirm;
   });
 
   test('handles error and exits with code 1', async () => {

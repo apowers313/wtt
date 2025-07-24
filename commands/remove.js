@@ -7,11 +7,21 @@ const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const PathUtils = require('../lib/pathUtils');
 const { addCommandContext } = require('../lib/errorTranslator');
+const { getCurrentWorktree } = require('../lib/currentWorktree');
 
 async function removeCommand(worktreeName, options) {
   try {
     await gitOps.validateRepository();
     await config.load();
+    
+    // Auto-detect current worktree if no name provided
+    if (!worktreeName) {
+      worktreeName = await getCurrentWorktree();
+      if (!worktreeName) {
+        throw new Error('No worktree specified and not currently inside a worktree. Use \'wt list\' to see available worktrees.');
+      }
+      console.log(chalk.gray(`Auto-detected current worktree: ${worktreeName}`));
+    }
     
     await portManager.init(config.getBaseDir());
     
@@ -43,8 +53,8 @@ async function removeCommand(worktreeName, options) {
         
         let confirmRemove = false;
         
-        // In test environment, auto-confirm based on force flag
-        if (process.env.NODE_ENV === 'test') {
+        // Auto-confirm in test/automation environments
+        if (process.env.WTT_AUTO_CONFIRM === 'true') {
           confirmRemove = options.force || false;
         } else {
           const result = await inquirer.prompt([{
@@ -68,8 +78,8 @@ async function removeCommand(worktreeName, options) {
         
         let confirmRemove = false;
         
-        // In test environment, auto-confirm based on force flag
-        if (process.env.NODE_ENV === 'test') {
+        // Auto-confirm in test/automation environments
+        if (process.env.WTT_AUTO_CONFIRM === 'true') {
           confirmRemove = options.force || false;
         } else {
           const result = await inquirer.prompt([{
@@ -91,8 +101,8 @@ async function removeCommand(worktreeName, options) {
       
       let confirmFinal = true;
       
-      // In test environment, auto-confirm, otherwise prompt
-      if (process.env.NODE_ENV !== 'test') {
+      // Auto-confirm in test/automation environments, otherwise prompt
+      if (process.env.WTT_AUTO_CONFIRM !== 'true') {
         const result = await inquirer.prompt([{
           type: 'confirm',
           name: 'confirmFinal',

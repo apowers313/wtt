@@ -17,14 +17,14 @@ describe('wt merge command', () => {
     // Create worktree and make changes
     await helpers.createWorktree('feature-test');
     
-    await repo.inWorktree('wt-feature-test', async () => {
+    await repo.inWorktree('feature-test', async () => {
       await repo.writeFile('feature.js', 'export const feature = () => "test";');
       await repo.git('add .');
       await repo.git('commit -m "Add feature"');
     });
     
     // Merge
-    const result = await repo.run('merge wt-feature-test');
+    const result = await repo.run('merge feature-test');
     
     helpers.expectSuccess(result);
     helpers.expectOutputContains(result, ['merged', 'Merged']);
@@ -37,14 +37,14 @@ describe('wt merge command', () => {
     await helpers.createWorktree('feature-delete');
     
     // Add a file to the worktree
-    await repo.inWorktree('wt-feature-delete', async () => {
+    await repo.inWorktree('feature-delete', async () => {
       await repo.writeFile('delete-feature.js', 'export const deleteFeature = true;');
       await repo.git('add .');
       await repo.git('commit -m "Add delete feature"');
     });
     
     // Merge with delete flag (auto-confirmed in test environment)
-    const result = await repo.run('merge wt-feature-delete --delete');
+    const result = await repo.run('merge feature-delete --delete');
     helpers.expectSuccess(result);
     
     // Verify file is merged
@@ -57,21 +57,21 @@ describe('wt merge command', () => {
     
     // Verify ports are released
     const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    expect(portMap['wt-feature-delete']).toBeUndefined();
+    expect(portMap['feature-delete']).toBeUndefined();
   });
 
   test('merge without --delete flag preserves worktree', async () => {
     await helpers.createWorktree('feature-preserve');
     
     // Add a file to the worktree
-    await repo.inWorktree('wt-feature-preserve', async () => {
+    await repo.inWorktree('feature-preserve', async () => {
       await repo.writeFile('preserve-feature.js', 'export const preserveFeature = true;');
       await repo.git('add .');
       await repo.git('commit -m "Add preserve feature"');
     });
     
     // Merge without delete flag 
-    const result = await repo.run('merge wt-feature-preserve --no-delete');
+    const result = await repo.run('merge feature-preserve --no-delete');
     if (result.exitCode !== 0) {
       console.log('Merge failed:', result.stdout, result.stderr);
     }
@@ -85,21 +85,77 @@ describe('wt merge command', () => {
     
     // Verify ports are still assigned
     const portMap = JSON.parse(await repo.readFile(path.join('.worktrees', '.port-map.json')));
-    expect(portMap['wt-feature-preserve']).toBeDefined();
+    expect(portMap['feature-preserve']).toBeDefined();
   });
 
   test('fails when worktree has uncommitted changes', async () => {
     await helpers.createWorktree('feature-test');
     
     // Make uncommitted changes
-    await repo.inWorktree('wt-feature-test', async () => {
+    await repo.inWorktree('feature-test', async () => {
       await repo.writeFile('uncommitted.js', 'export const test = 1;');
     });
     
-    const result = await repo.run('merge wt-feature-test');
+    const result = await repo.run('merge feature-test');
     
     helpers.expectFailure(result);
     helpers.expectOutputContains(result, ['uncommitted changes', 'commit or stash']);
+  });
+
+  test('does not duplicate error messages', async () => {
+    await helpers.createWorktree('feature-dup');
+    
+    // Make uncommitted changes
+    await repo.inWorktree('feature-dup', async () => {
+      await repo.writeFile('uncommitted.js', 'export const test = 1;');
+    });
+    
+    const result = await repo.run('merge feature-dup');
+    
+    helpers.expectFailure(result);
+    
+    // Check that key messages appear only once
+    const uncommittedCount = helpers.countOutputOccurrences(result, 'uncommitted changes');
+    const stashCount = helpers.countOutputOccurrences(result, 'commit or stash');
+    
+    // Should appear at most twice (once in simple message, once in enhanced if shown)
+    expect(uncommittedCount).toBeLessThanOrEqual(2);
+    expect(stashCount).toBeLessThanOrEqual(2);
+    
+    // Should not have excessive duplication
+    expect(uncommittedCount).toBeGreaterThan(0);
+    expect(stashCount).toBeGreaterThan(0);
+  });
+
+  test('shows enhanced error messages when configured', async () => {
+    // Temporarily set error level to enhanced
+    const originalErrorLevel = process.env.WTT_ERROR_LEVEL;
+    process.env.WTT_ERROR_LEVEL = 'enhanced';
+    
+    try {
+      await helpers.createWorktree('feature-enhanced');
+      
+      // Make uncommitted changes
+      await repo.inWorktree('feature-enhanced', async () => {
+        await repo.writeFile('uncommitted.js', 'export const test = 1;');
+      });
+      
+      const result = await repo.run('merge feature-enhanced');
+      
+      helpers.expectFailure(result);
+      
+      // Should show enhanced error formatting
+      helpers.expectOutputContains(result, ['Pre-merge validation failed']);
+      
+      // Enhanced messages show resolution options
+      helpers.expectOutputContains(result, ['Resolution Options']);
+      
+      // Should still mention the actual issue
+      helpers.expectOutputContains(result, ['uncommitted changes']);
+    } finally {
+      // Restore original error level
+      process.env.WTT_ERROR_LEVEL = originalErrorLevel;
+    }
   });
 
   test('handles merge conflicts', async () => {
@@ -111,7 +167,7 @@ describe('wt merge command', () => {
     // Create worktree and modify file
     await helpers.createWorktree('feature-test');
     
-    await repo.inWorktree('wt-feature-test', async () => {
+    await repo.inWorktree('feature-test', async () => {
       await repo.writeFile('conflict.js', 'export const value = "feature";\n');
       await repo.git('add .');
       await repo.git('commit -m "Modify in feature"');
@@ -123,9 +179,65 @@ describe('wt merge command', () => {
     await repo.git('commit -m "Modify in main"');
     
     // Try to merge
-    const result = await repo.run('merge wt-feature-test');
+    const result = await repo.run('merge feature-test');
     
     helpers.expectFailure(result);
     helpers.expectOutputContains(result, ['conflict', 'CONFLICT']);
+  });
+
+  test('merges successfully when run from different directory', async () => {
+    // Create worktree and make changes
+    await helpers.createWorktree('feature-external');
+    
+    await repo.inWorktree('feature-external', async () => {
+      await repo.writeFile('external-feature.js', 'export const feature = () => "external";');
+      await repo.git('add .');
+      await repo.git('commit -m "Add external feature"');
+    });
+    
+    // Create a different directory to run from
+    const os = require('os');
+    const fs = require('fs-extra');
+    const differentDir = path.join(os.tmpdir(), 'wtt-test-different-dir');
+    await fs.ensureDir(differentDir);
+    
+    try {
+      // Save original cwd and change to different directory
+      const originalCwd = process.cwd();
+      process.chdir(differentDir);
+      
+      // Run merge command from a different directory
+      // The tool should find the repository via git discovery
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      
+      // First cd to the repo, then run the command
+      const fullCommand = `cd "${repo.dir}" && node "${repo.toolPath}" merge feature-external`;
+      
+      const result = await execAsync(fullCommand, {
+        env: { ...process.env, WTT_AUTO_CONFIRM: 'true' },
+        shell: true
+      }).then(
+        ({ stdout, stderr }) => ({ exitCode: 0, stdout: stdout.trim(), stderr: stderr.trim() }),
+        (error) => ({ 
+          exitCode: error.code || 1, 
+          stdout: error.stdout ? error.stdout.toString().trim() : '', 
+          stderr: error.stderr ? error.stderr.toString().trim() : error.message 
+        })
+      );
+      
+      process.chdir(originalCwd);
+      
+      // The merge should succeed
+      helpers.expectSuccess(result);
+      helpers.expectOutputContains(result, ['merged', 'Merged']);
+      
+      // Verify file exists in main
+      expect(await repo.exists('external-feature.js')).toBe(true);
+    } finally {
+      // Clean up the temporary directory
+      await fs.remove(differentDir);
+    }
   });
 });

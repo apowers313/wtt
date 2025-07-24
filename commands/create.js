@@ -24,16 +24,27 @@ async function createCommand(branchName, options) {
       throw new Error(`A worktree already exists at ${worktreePath}. Use 'wt switch ${worktreeName}' to work in it, or 'wt remove ${worktreeName}' to delete it first`);
     }
     
-    const baseBranch = options.from || null;
-    if (baseBranch) {
-      const branchExists = await gitOps.checkBranchExists(baseBranch);
-      if (!branchExists) {
-        throw new Error(`The branch '${baseBranch}' doesn't exist. Use 'git branch' to see available branches, or omit the --from option to create from the current branch`);
-      }
+    const mainBranch = await gitOps.getMainBranch(cfg);
+    const baseBranch = options.from || mainBranch;
+    const targetBranchExists = await gitOps.checkBranchExists(branchName);
+    
+    // Check if the base branch exists
+    const branchExists = await gitOps.checkBranchExists(baseBranch);
+    if (!branchExists) {
+      throw new Error(`The branch '${baseBranch}' doesn't exist. Use 'git branch' to see available branches, or specify a different branch with --from`);
     }
     
-    await gitOps.createWorktree(worktreePath, branchName, baseBranch);
+    await gitOps.createWorktree(worktreePath, branchName, baseBranch, mainBranch);
     console.log(`✓ Worktree created at ${worktreePath}`);
+    
+    // Only show "created from" message when we're actually creating a new branch
+    if (!targetBranchExists && baseBranch) {
+      if (!options.from) {
+        console.log(`✓ Created new branch '${branchName}' from '${mainBranch}' (default)`);
+      } else {
+        console.log(`✓ Created new branch '${branchName}' from '${baseBranch}'`);
+      }
+    }
     
     await portManager.init(config.getBaseDir());
     

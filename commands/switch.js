@@ -4,16 +4,59 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const { spawn } = require('child_process');
 const os = require('os');
+const inquirer = require('inquirer');
 const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const { addCommandContext } = require('../lib/errorTranslator');
 const PromptBuilder = require('../lib/promptBuilder');
+const { getCurrentWorktree } = require('../lib/currentWorktree');
 
 async function switchCommand(worktreeName, options = {}) {
   try {
     await gitOps.validateRepository();
     await config.load();
+    
+    // Show list of worktrees if no name provided
+    if (!worktreeName) {
+      // Get all worktrees
+      const worktrees = await gitOps.getWorktrees();
+      
+      if (worktrees.length === 0) {
+        throw new Error('No worktrees found. Use \'wt create <branch>\' to create one.');
+      }
+      
+      // Get current worktree to optionally filter it out
+      const currentWorktree = await getCurrentWorktree();
+      
+      // Filter out main worktree and optionally current worktree
+      const switchableWorktrees = worktrees.filter(wt => {
+        if (wt.isMainWorktree) return false;
+        // Don't filter out current worktree - user might want to refresh
+        return true;
+      });
+      
+      if (switchableWorktrees.length === 0) {
+        throw new Error('No worktrees available to switch to.');
+      }
+      
+      // Show interactive selection
+      const { selectedWorktree } = await inquirer.prompt([{
+        type: 'list',
+        name: 'selectedWorktree',
+        message: 'Select worktree to switch to:',
+        choices: switchableWorktrees.map(wt => {
+          const isCurrent = wt.name === currentWorktree;
+          const label = isCurrent ? `${wt.name} (current)` : wt.name;
+          return {
+            name: `${label} - ${wt.branch}`,
+            value: wt.name
+          };
+        })
+      }]);
+      
+      worktreeName = selectedWorktree;
+    }
     
     await portManager.init(config.getBaseDir());
     

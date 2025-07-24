@@ -3,10 +3,15 @@ module.exports = {
   testMatch: [
     '**/test/**/*.test.js'
   ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/.worktrees/'
+  ],
   collectCoverageFrom: [
     'lib/**/*.js',
     'commands/**/*.js',
-    '!**/node_modules/**'
+    '!**/node_modules/**',
+    '!**/.worktrees/**'
   ],
   coverageThreshold: {
     global: {

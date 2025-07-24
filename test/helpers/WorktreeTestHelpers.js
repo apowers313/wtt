@@ -29,6 +29,11 @@ class WorktreeTestHelpers {
       throw new Error(`Init failed: ${result.stderr || result.stdout}`);
     }
     
+    // Add worktree files to .gitignore for tests
+    await this.repo.writeFile('.gitignore', '.worktree-config.json\n.worktrees/\n');
+    await this.repo.git('add .gitignore');
+    await this.repo.git('commit -m "Add worktree files to gitignore"');
+    
     return result;
   }
 
@@ -194,6 +199,43 @@ class WorktreeTestHelpers {
   }
 
   /**
+   * Check that a string appears exactly once in the output
+   */
+  expectOutputOnce(result, string) {
+    const output = (result.stdout + result.stderr).toLowerCase();
+    const searchString = string.toLowerCase();
+    const regex = new RegExp(searchString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    const matches = output.match(regex) || [];
+    
+    if (matches.length !== 1) {
+      throw new Error(`Expected "${string}" to appear exactly once, but found ${matches.length} occurrences\nOutput: ${result.stdout + result.stderr}`);
+    }
+  }
+
+  /**
+   * Check that a string does not appear in the output
+   */
+  expectNoOutput(result, string) {
+    const output = (result.stdout + result.stderr).toLowerCase();
+    const searchString = string.toLowerCase();
+    
+    if (output.includes(searchString)) {
+      throw new Error(`Expected output not to contain "${string}"\nOutput: ${result.stdout + result.stderr}`);
+    }
+  }
+
+  /**
+   * Count occurrences of a string in the output
+   */
+  countOutputOccurrences(result, string) {
+    const output = (result.stdout + result.stderr).toLowerCase();
+    const searchString = string.toLowerCase();
+    const regex = new RegExp(searchString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    const matches = output.match(regex) || [];
+    return matches.length;
+  }
+
+  /**
    * Check port assignment with flexible matching
    */
   expectPortAssignment(result, service, options = {}) {
@@ -238,8 +280,8 @@ class WorktreeTestHelpers {
    * Check if worktree exists with retries for timing issues
    */
   async expectWorktreeExists(branch, shouldExist = true) {
-    // With default config using wt-{branch} pattern
-    const name = `wt-${branch}`;
+    // With default config using {branch} pattern
+    const name = branch;
     const worktreePath = path.join('.worktrees', name);
     
     
@@ -262,8 +304,8 @@ class WorktreeTestHelpers {
    */
   async expectWorktreeStatus(branch, expectedStatus) {
     const result = await this.repo.run('list -v');
-    // With default config using wt-{branch} pattern
-    const name = `wt-${branch}`;
+    // With default config using {branch} pattern
+    const name = branch;
     
     const statusAliases = {
       'clean': ['clean', 'Clean', 'up to date', ''],
@@ -287,8 +329,8 @@ class WorktreeTestHelpers {
    * Check if ports are assigned
    */
   async expectPortsAssigned(branch, services) {
-    // With default config using wt-{branch} pattern
-    const name = `wt-${branch}`;
+    // With default config using {branch} pattern
+    const name = branch;
     const portMapPath = path.join('.worktrees', '.port-map.json');
     
     
@@ -323,8 +365,8 @@ class WorktreeTestHelpers {
    * Check environment file
    */
   async expectEnvFile(branch, variables) {
-    // With default config using wt-{branch} pattern
-    const name = `wt-${branch}`;
+    // With default config using {branch} pattern
+    const name = branch;
     const envPath = path.join('.worktrees', name, '.env.worktree');
     
     const content = await this.repo.readFile(envPath);
@@ -343,8 +385,8 @@ class WorktreeTestHelpers {
    * Get worktree name with prefix
    */
   getWorktreeName(branch) {
-    // With default config using wt-{branch} pattern
-    return `wt-${branch}`;
+    // With default config using {branch} pattern
+    return branch;
   }
 
   /**

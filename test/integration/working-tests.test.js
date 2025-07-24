@@ -36,7 +36,7 @@ describe('Git Worktree Tool - Working Tests', () => {
     expect(result.stdout).toContain('Assigned ports');
     
     // Check worktree exists
-    expect(await repo.exists(path.join('.worktrees', 'wt-test-feature'))).toBe(true);
+    expect(await repo.exists(path.join('.worktrees', 'test-feature'))).toBe(true);
   });
 
   test('list command shows worktrees', async () => {
@@ -66,26 +66,26 @@ describe('Git Worktree Tool - Working Tests', () => {
     await repo.run('init');
     await repo.run('create test-feature --from main');
     
-    const result = await repo.run('switch wt-test-feature --no-shell');
+    const result = await repo.run('switch test-feature --no-shell');
     
     if (result.exitCode !== 0) {
       console.log('Switch failed:', result.stdout, result.stderr);
     }
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('cd ');
-    expect(result.stdout).toContain(path.join('.worktrees', 'wt-test-feature'));
+    expect(result.stdout).toContain(path.join('.worktrees', 'test-feature'));
   });
 
   test('remove command with force flag', async () => {
     await repo.run('init');
     await repo.run('create test-feature --from main');
     
-    const result = await repo.run('remove wt-test-feature --force');
+    const result = await repo.run('remove test-feature --force');
     
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('Removed worktree');
     
     // Verify worktree is gone
-    expect(await repo.exists(path.join('.worktrees', 'wt-test-feature'))).toBe(false);
+    expect(await repo.exists(path.join('.worktrees', 'test-feature'))).toBe(false);
   });
 });

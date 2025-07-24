@@ -2,6 +2,11 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 
+// Set test environment
+process.env.NODE_ENV = 'test';
+process.env.WTT_AUTO_CONFIRM = 'true';
+process.env.WTT_ERROR_LEVEL = 'simple';
+
 // Ensure test directory exists
 beforeAll(async () => {
   const testDir = path.join(os.tmpdir(), 'wtt-tests');

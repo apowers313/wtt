@@ -49,8 +49,16 @@ class TestRepository {
     // Quote the tool path to handle spaces in Windows paths
     const fullCommand = `node "${this.toolPath}" ${command.replace('wt ', '')}`;
     
+    // Save current directory and change to test repo
+    const originalCwd = process.cwd();
+    process.chdir(this.dir);
     
-    return await this.exec(fullCommand);
+    try {
+      return await this.exec(fullCommand);
+    } finally {
+      // Always restore original directory
+      process.chdir(originalCwd);
+    }
   }
   
   async git(command) {
@@ -62,7 +70,10 @@ class TestRepository {
     // const startTime = Date.now();
     
     try {
-      const { stdout, stderr } = await execAsync(command, { cwd: this.dir });
+      const { stdout, stderr } = await execAsync(command, { 
+        cwd: this.dir,
+        env: { ...process.env }  // Ensure environment variables are passed
+      });
       
       const result = { 
         exitCode: 0, 
@@ -75,10 +86,32 @@ class TestRepository {
     } catch (error) {
       // const duration = Date.now() - startTime;
       
+      // Properly extract stdout and stderr from the error object
+      let stdout = '';
+      let stderr = '';
+      
+      if (error.stdout !== undefined) {
+        stdout = error.stdout.toString().trim();
+      }
+      if (error.stderr !== undefined) {
+        stderr = error.stderr.toString().trim();
+      }
+      
+      // If no stderr from command, check if error has the actual command output
+      if (!stderr && error.message) {
+        // Extract the actual error from the message if it contains it
+        const match = error.message.match(/Command failed:.*?\n([\s\S]*)/);
+        if (match && match[1]) {
+          stderr = match[1].trim();
+        } else {
+          stderr = error.message;
+        }
+      }
+      
       const result = { 
         exitCode: error.code || 1, 
-        stdout: error.stdout?.trim() || '', 
-        stderr: error.stderr?.trim() || error.message 
+        stdout: stdout, 
+        stderr: stderr 
       };
       
       

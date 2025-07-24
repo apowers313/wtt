@@ -30,7 +30,7 @@ describe('Basic workflow test', () => {
     helpers.expectSuccess(createResult);
     
     // Make changes in worktree
-    await repo.inWorktree('wt-feature-workflow', async () => {
+    await repo.inWorktree('feature-workflow', async () => {
       await repo.writeFile('feature.js', 'export const feature = true;');
       await repo.git('add .');
       await repo.git('commit -m "Add feature"');
@@ -39,17 +39,17 @@ describe('Basic workflow test', () => {
     // List worktrees
     const listResult = await repo.run('list -v');
     helpers.expectSuccess(listResult);
-    helpers.expectOutputContains(listResult, 'wt-feature-workflow');
+    helpers.expectOutputContains(listResult, 'feature-workflow');
     
     // Merge with --no-delete flag to prevent auto cleanup
-    const mergeResult = await repo.run('merge wt-feature-workflow --no-delete');
+    const mergeResult = await repo.run('merge feature-workflow --no-delete');
     helpers.expectSuccess(mergeResult);
     
     // Verify merge completed
     expect(await repo.exists('feature.js')).toBe(true);
     
     // Clean up worktree manually with force flag
-    const removeResult = await repo.run('remove wt-feature-workflow --force');
+    const removeResult = await repo.run('remove feature-workflow --force');
     helpers.expectSuccess(removeResult);
     
     // Verify worktree cleaned up

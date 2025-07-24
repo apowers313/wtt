@@ -69,7 +69,7 @@ function createMockConfig() {
     }),
     update: jest.fn().mockResolvedValue(),
     getWorktreeDir: jest.fn().mockReturnValue('.worktrees'),
-    getWorktreePath: jest.fn((branch) => path.join('.worktrees', `wt-${branch}`))
+    getWorktreePath: jest.fn((branch) => path.join('.worktrees', branch))
   };
 }
 

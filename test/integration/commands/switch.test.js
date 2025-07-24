@@ -17,7 +17,7 @@ describe('wt switch command', () => {
   test('provides cd command for switching to worktree', async () => {
     await repo.run('create feature-test --from main');
     
-    const result = await repo.run('switch wt-feature-test --no-shell');
+    const result = await repo.run('switch feature-test --no-shell');
     
     if (process.env.CI || process.env.DEBUG_TESTS) {
       console.log('\n[DEBUG] switch test:');
@@ -25,7 +25,7 @@ describe('wt switch command', () => {
       console.log('  Exit code:', result.exitCode);
       console.log('  STDOUT:', result.stdout);
       console.log('  STDERR:', result.stderr);
-      console.log('  Expected path component:', path.join('.worktrees', 'wt-feature-test'));
+      console.log('  Expected path component:', path.join('.worktrees', 'feature-test'));
       
       if (process.platform === 'win32') {
         console.log('  Windows path separators in stdout:', result.stdout.includes('\\'));
@@ -38,7 +38,7 @@ describe('wt switch command', () => {
     expect(result.stdout).toContain('cd ');
     
     // Handle platform-specific path separators
-    const expectedRelativePath = path.join('.worktrees', 'wt-feature-test');
+    const expectedRelativePath = path.join('.worktrees', 'feature-test');
     
     // More flexible path matching - check for the worktree path pattern
     const pathMatches = [
@@ -47,10 +47,10 @@ describe('wt switch command', () => {
       expectedRelativePath.replace(/\\/g, '/'),
       expectedRelativePath.replace(/\//g, '\\'),
       // Just the worktree directory name pattern
-      '.worktrees/wt-feature-test',
-      '.worktrees\\wt-feature-test',
+      '.worktrees/feature-test',
+      '.worktrees\\feature-test',
       // Any path ending with the worktree name
-      'wt-feature-test'
+      'feature-test'
     ];
     
     let pathInOutput = false;
@@ -66,7 +66,7 @@ describe('wt switch command', () => {
     
     // Additional check: if output contains "cd " followed by any path ending with wt-feature-test
     if (!pathInOutput) {
-      const cdPattern = /cd\s+(.+[\\/]wt-feature-test)/;
+      const cdPattern = /cd\s+(.+[\\/]feature-test)/;
       const match = result.stdout.match(cdPattern);
       if (match) {
         pathInOutput = true;
@@ -80,7 +80,7 @@ describe('wt switch command', () => {
   });
 
   test('fails when worktree not found', async () => {
-    const result = await repo.run('switch wt-nonexistent --no-shell');
+    const result = await repo.run('switch nonexistent --no-shell');
     
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('doesn\'t exist');
@@ -89,9 +89,9 @@ describe('wt switch command', () => {
   test('provides absolute path', async () => {
     await repo.run('create feature-test --from main');
     
-    const result = await repo.run('switch wt-feature-test --no-shell');
+    const result = await repo.run('switch feature-test --no-shell');
     
-    const expectedPath = path.join(repo.dir, '.worktrees', 'wt-feature-test');
+    const expectedPath = path.join(repo.dir, '.worktrees', 'feature-test');
     
     if (process.env.CI || process.env.DEBUG_TESTS) {
       console.log('\n[DEBUG] absolute path test:');
@@ -132,7 +132,7 @@ describe('wt switch command', () => {
     
     // Additional fallback: check if output contains a path ending with our target
     if (!pathInOutput) {
-      const targetEnding = path.join('.worktrees', 'wt-feature-test');
+      const targetEnding = path.join('.worktrees', 'feature-test');
       const endings = [
         targetEnding,
         targetEnding.replace(/\\/g, '/'),
@@ -151,5 +151,20 @@ describe('wt switch command', () => {
     }
     
     expect(pathInOutput).toBe(true);
+  });
+
+  test('shows interactive list when no argument provided', async () => {
+    // Create multiple worktrees
+    await repo.run('create feature-one --from main');
+    await repo.run('create feature-two --from main');
+    
+    // When running without argument, it will show an interactive list
+    // In non-interactive environment, it should fail with appropriate error
+    const result = await repo.run('switch', { expectFailure: true });
+    
+    // Should fail because inquirer can't prompt in non-interactive mode
+    expect(result.exitCode).toBe(1);
+    // The error might be about non-TTY environment or similar
+    expect(result.stderr || result.stdout).toBeTruthy();
   });
 });

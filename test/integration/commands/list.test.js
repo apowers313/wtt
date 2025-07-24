@@ -53,8 +53,8 @@ describe('wt list command', () => {
     console.log('[DEBUG] list test - List command stderr:', result.stderr);
     
     helpers.expectSuccess(result);
-    helpers.expectOutputContains(result, 'wt-feature-1');
-    helpers.expectOutputContains(result, 'wt-feature-2');
+    helpers.expectOutputContains(result, 'feature-1');
+    helpers.expectOutputContains(result, 'feature-2');
     helpers.expectOutputContains(result, 'feature-1');
     helpers.expectOutputContains(result, 'feature-2');
   });
@@ -68,7 +68,7 @@ describe('wt list command', () => {
     await helpers.createWorktree('feature-test');
     
     // Add a file to make it dirty
-    const filePath = path.join('.worktrees', 'wt-feature-test', 'new-file.txt');
+    const filePath = path.join('.worktrees', 'feature-test', 'new-file.txt');
     console.log('[DEBUG] verbose test - Writing file to:', filePath);
     await repo.writeFile(filePath, 'content');
     
@@ -83,7 +83,7 @@ describe('wt list command', () => {
     console.log('[DEBUG] verbose test - List -v stderr:', result.stderr);
     
     helpers.expectSuccess(result);
-    helpers.expectOutputContains(result, 'wt-feature-test');
+    helpers.expectOutputContains(result, 'feature-test');
     helpers.expectOutputContains(result, 'feature-test');
     
     // Should show status - but be flexible about exact text

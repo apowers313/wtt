@@ -17,7 +17,7 @@ describe('wt remove command (simplified)', () => {
     await helpers.createWorktree('feature-test');
     
     // Force flag bypasses all prompts
-    const result = await repo.run('remove wt-feature-test --force');
+    const result = await repo.run('remove feature-test --force');
     
     helpers.expectSuccess(result);
     helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree', 'Cleaned up worktree directory']);
@@ -29,7 +29,7 @@ describe('wt remove command (simplified)', () => {
   });
 
   test('fails when worktree does not exist', async () => {
-    const result = await repo.run('remove wt-nonexistent --force');
+    const result = await repo.run('remove nonexistent --force');
     
     helpers.expectFailure(result);
     helpers.expectOutputContains(result, ['not found', 'does not exist', 'doesn\'t exist']);
@@ -42,7 +42,7 @@ describe('wt remove command (simplified)', () => {
     const worktreePath = path.join('.worktrees', helpers.getWorktreeName('feature-test'));
     await repo.writeFile(path.join(worktreePath, 'uncommitted.js'), 'export const test = 1;');
     
-    const result = await repo.run('remove wt-feature-test --force');
+    const result = await repo.run('remove feature-test --force');
     
     helpers.expectSuccess(result);
     helpers.expectOutputContains(result, ['removed worktree', 'Removed worktree', 'Cleaned up worktree directory']);

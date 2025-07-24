@@ -16,10 +16,10 @@ describe('wt ports command', () => {
   test('shows ports for specific worktree', async () => {
     await repo.run('create feature-test --from main');
     
-    const result = await repo.run('ports wt-feature-test');
+    const result = await repo.run('ports feature-test');
     
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('wt-feature-test');
+    expect(result.stdout).toContain('feature-test');
     expect(result.stdout).toContain('vite: 3000');
     expect(result.stdout).toContain('storybook: 6006');
     expect(result.stdout).toContain('custom: 8000');
@@ -32,9 +32,9 @@ describe('wt ports command', () => {
     const result = await repo.run('ports');
     
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('wt-feature-1');
+    expect(result.stdout).toContain('feature-1');
     expect(result.stdout).toContain('vite: 3000');
-    expect(result.stdout).toContain('wt-feature-2');
+    expect(result.stdout).toContain('feature-2');
     expect(result.stdout).toContain('vite: 3010');
   });
 
@@ -47,7 +47,7 @@ describe('wt ports command', () => {
   });
 
   test('shows message when worktree has no ports', async () => {
-    const result = await repo.run('ports wt-nonexistent');
+    const result = await repo.run('ports nonexistent');
     
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('No ports assigned to worktree');

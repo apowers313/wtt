@@ -178,7 +178,7 @@ class TestDataBuilders {
         custom: { start: 8000, increment: 10 }
       },
       mainBranch: 'main',
-      namePattern: 'wt-{branch}',
+      namePattern: '{branch}',
       autoCleanup: true,
       ...overrides
     };
@@ -224,7 +224,7 @@ class TestDataBuilders {
         `${service.toUpperCase()}_PORT=${port}`
       ),
       `WORKTREE_NAME=${worktreeName}`,
-      `WORKTREE_BRANCH=${worktreeName.replace('wt-', '')}`,
+      `WORKTREE_BRANCH=${worktreeName}`,
       ''
     ];
     

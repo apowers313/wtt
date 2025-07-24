@@ -107,7 +107,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
         ...options.env
       };
 
-      const switchProcess = trackProcess(spawn('node', [wtPath, 'switch', 'wt-test-feature'], {
+      const switchProcess = trackProcess(spawn('node', [wtPath, 'switch', 'test-feature'], {
         cwd: repoDir,
         env
       }));
@@ -190,7 +190,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
       const result = await testShellPrompt(
         '/bin/bash',
         'bash',
-        /wt-test-feature.*[▶>]/,  // Look for worktree name and prompt symbol
+        /test-feature.*[▶>]/,  // Look for worktree name and prompt symbol
         { skipPromptCheck: true }  // Skip prompt check since we can't capture it
       );
 
@@ -206,7 +206,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
       const result = await testShellPrompt(
         '/bin/sh',
         'sh',
-        /wt-test-feature|>/, // sh might have limited prompt support
+        /test-feature|>/, // sh might have limited prompt support
         { skipPromptCheck: true } // sh might not show our custom prompt
       );
 
@@ -222,7 +222,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
       const result = await testShellPrompt(
         '/usr/bin/zsh',
         'zsh',
-        /wt-test-feature.*[▶>]/,
+        /test-feature.*[▶>]/,
         { skipPromptCheck: true }  // Skip prompt check since stdio is inherited
       );
 
@@ -245,7 +245,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
       const result = await testShellPrompt(
         '/bin/bash',
         'bash',
-        /wt-test-feature.*[▶>]/,
+        /test-feature.*[▶>]/,
         { skipPromptCheck: true }  // Skip prompt check since stdio is inherited
       );
 
@@ -260,7 +260,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
       const result = await testShellPrompt(
         '/bin/zsh',
         'zsh',
-        /wt-test-feature.*[▶>]/,
+        /test-feature.*[▶>]/,
         { skipPromptCheck: true }  // Skip prompt check since stdio is inherited
       );
 
@@ -303,7 +303,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
       const result = await testShellPrompt(
         shellPath,
         'PowerShell',
-        /wt-test-feature.*[▶>]/,
+        /test-feature.*[▶>]/,
         {
           skipPromptCheck: true,  // Skip prompt check since stdio is inherited
           env: {
@@ -322,7 +322,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
       const result = await testShellPrompt(
         'cmd.exe',
         'cmd',
-        /wt-test-feature|>/, // cmd has limited prompt support
+        /test-feature|>/, // cmd has limited prompt support
         { 
           skipPromptCheck: true,
           env: {
@@ -343,7 +343,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
         (process.env.COMSPEC || 'cmd.exe') : 
         (process.env.SHELL || '/bin/sh');
 
-      const switchProcess = trackProcess(spawn('node', [wtPath, 'switch', 'wt-test-feature'], {
+      const switchProcess = trackProcess(spawn('node', [wtPath, 'switch', 'test-feature'], {
         cwd: repoDir,
         env: { ...process.env, SHELL: shellPath }
       }));
@@ -378,10 +378,10 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
         switchProcess.on('close', () => {
           clearTimeout(timeout);
           
-          expect(output).toContain('WT_WORKTREE=wt-test-feature');
+          expect(output).toContain('WT_WORKTREE=test-feature');
           expect(output).toContain('WT_WORKTREE_PATH=');
           expect(output).toContain('.worktrees');
-          expect(output).toContain('wt-test-feature');
+          expect(output).toContain('test-feature');
           
           resolve();
         });
@@ -409,7 +409,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
       await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
       // Just verify the config is loaded correctly
-      const output = execSync(`node ${wtPath} switch wt-test-feature --no-shell`, {
+      const output = execSync(`node ${wtPath} switch test-feature --no-shell`, {
         cwd: repoDir
       }).toString();
 
@@ -420,7 +420,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
     it('should handle missing shell gracefully', async () => {
       // Just verify that the switch command with an invalid shell
       // doesn't crash the process
-      const output = execSync(`SHELL=/nonexistent/shell node ${wtPath} switch wt-test-feature --no-shell`, {
+      const output = execSync(`SHELL=/nonexistent/shell node ${wtPath} switch test-feature --no-shell`, {
         cwd: repoDir,
         env: { ...process.env, SHELL: '/nonexistent/shell' }
       }).toString();
@@ -445,7 +445,7 @@ describe('Switch Command Shell Spawning - OS Specific', () => {
     it('should complete quickly in CI environments', async () => {
       const start = Date.now();
       
-      const output = execSync(`node ${wtPath} switch wt-test-feature --no-shell`, {
+      const output = execSync(`node ${wtPath} switch test-feature --no-shell`, {
         cwd: repoDir
       }).toString();
 

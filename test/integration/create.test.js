@@ -43,7 +43,7 @@ describe('wt create command (integration)', () => {
     helpers.expectSuccess(result);
     
     // Check that the file from develop branch exists in worktree
-    expect(await repo.exists(path.join('.worktrees', 'wt-feature-from-develop', 'develop.txt'))).toBe(true);
+    expect(await repo.exists(path.join('.worktrees', 'feature-from-develop', 'develop.txt'))).toBe(true);
   });
 
   test('fails if branch already exists', async () => {

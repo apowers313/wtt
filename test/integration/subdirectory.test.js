@@ -75,10 +75,10 @@ describe('Subdirectory Command Execution', () => {
       }).toString();
       
       expect(output).to.include('Worktree created at');
-      expect(output).to.include('.worktrees/wt-feature-test');
+      expect(output).to.include('.worktrees/feature-test');
       
       // Verify worktree was created in correct location
-      const worktreePath = path.join(repoDir, '.worktrees', 'wt-feature-test');
+      const worktreePath = path.join(repoDir, '.worktrees', 'feature-test');
       const worktreeExists = await fs.access(worktreePath).then(() => true).catch(() => false);
       expect(worktreeExists).to.be.true;
     });
@@ -94,7 +94,7 @@ describe('Subdirectory Command Execution', () => {
       expect(output).to.include('Worktree created at');
       
       // Verify worktree in correct location
-      const worktreePath = path.join(repoDir, '.worktrees', 'wt-deep-feature');
+      const worktreePath = path.join(repoDir, '.worktrees', 'deep-feature');
       const worktreeExists = await fs.access(worktreePath).then(() => true).catch(() => false);
       expect(worktreeExists).to.be.true;
     });
@@ -112,7 +112,7 @@ describe('Subdirectory Command Execution', () => {
       
       const output = execSync(`node ${wtPath} list`, { cwd: subDir }).toString();
       
-      expect(output).to.include('wt-list-test');
+      expect(output).to.include('list-test');
       expect(output).to.include('vite:');
       expect(output).to.include('storybook:');
     });
@@ -140,12 +140,12 @@ describe('Subdirectory Command Execution', () => {
       const subDir = path.join(repoDir, 'src', 'utils');
       await fs.mkdir(subDir, { recursive: true });
       
-      const output = execSync(`node ${wtPath} switch wt-switch-test --no-shell`, { 
+      const output = execSync(`node ${wtPath} switch switch-test --no-shell`, { 
         cwd: subDir 
       }).toString();
       
       expect(output).to.include('Switching to worktree');
-      expect(output).to.include('wt-switch-test');
+      expect(output).to.include('switch-test');
       expect(output).to.include('Assigned ports');
     });
   });
@@ -172,11 +172,11 @@ describe('Subdirectory Command Execution', () => {
       const subDir = path.join(repoDir, 'scripts');
       await fs.mkdir(subDir, { recursive: true });
       
-      const output = execSync(`node ${wtPath} ports wt-ports-test-1`, { cwd: subDir }).toString();
+      const output = execSync(`node ${wtPath} ports ports-test-1`, { cwd: subDir }).toString();
       
-      expect(output).to.include('wt-ports-test-1');
+      expect(output).to.include('ports-test-1');
       expect(output).to.include('vite:');
-      expect(output).not.to.include('wt-ports-test-2');
+      expect(output).not.to.include('ports-test-2');
     });
   });
 
@@ -190,7 +190,7 @@ describe('Subdirectory Command Execution', () => {
       const subDir = path.join(repoDir, 'build');
       await fs.mkdir(subDir, { recursive: true });
       
-      const output = execSync(`node ${wtPath} remove wt-remove-test --force`, { 
+      const output = execSync(`node ${wtPath} remove remove-test --force`, { 
         cwd: subDir 
       }).toString();
       
@@ -210,13 +210,13 @@ describe('Subdirectory Command Execution', () => {
     beforeEach(async () => {
       // Create a worktree
       execSync(`node ${wtPath} create worktree-commands --from master`, { cwd: repoDir });
-      worktreePath = path.join(repoDir, '.worktrees', 'wt-worktree-commands');
+      worktreePath = path.join(repoDir, '.worktrees', 'worktree-commands');
     });
 
     it('should list worktrees from within a worktree', async () => {
       const output = execSync(`node ${wtPath} list`, { cwd: worktreePath }).toString();
       
-      expect(output).to.include('wt-worktree-commands');
+      expect(output).to.include('worktree-commands');
       expect(output).to.include('Worktrees:');
     });
 
@@ -228,7 +228,7 @@ describe('Subdirectory Command Execution', () => {
       expect(output).to.include('Worktree created at');
       
       // Verify it was created in main repo's .worktrees
-      const newWorktreePath = path.join(repoDir, '.worktrees', 'wt-from-worktree');
+      const newWorktreePath = path.join(repoDir, '.worktrees', 'from-worktree');
       const exists = await fs.access(newWorktreePath).then(() => true).catch(() => false);
       expect(exists).to.be.true;
     });
@@ -239,7 +239,7 @@ describe('Subdirectory Command Execution', () => {
       
       const output = execSync(`node ${wtPath} list`, { cwd: worktreeSubDir }).toString();
       
-      expect(output).to.include('wt-worktree-commands');
+      expect(output).to.include('worktree-commands');
     });
   });
 
@@ -247,7 +247,7 @@ describe('Subdirectory Command Execution', () => {
     it('should handle worktree with committed .worktree-config.json', async () => {
       // Create worktree
       execSync(`node ${wtPath} create config-test --from master`, { cwd: repoDir });
-      const worktreePath = path.join(repoDir, '.worktrees', 'wt-config-test');
+      const worktreePath = path.join(repoDir, '.worktrees', 'config-test');
       
       // Copy config to worktree (simulating it being committed)
       const mainConfig = path.join(repoDir, '.worktree-config.json');
@@ -256,7 +256,7 @@ describe('Subdirectory Command Execution', () => {
       
       // Commands should still use main repo config
       const output = execSync(`node ${wtPath} list`, { cwd: worktreePath }).toString();
-      expect(output).to.include('wt-config-test');
+      expect(output).to.include('config-test');
       
       // Create another worktree from within the first one
       const output2 = execSync(`node ${wtPath} create nested-config --from master`, { 
@@ -265,8 +265,8 @@ describe('Subdirectory Command Execution', () => {
       expect(output2).to.include('Worktree created at');
       
       // Verify it was created in main repo, not nested
-      const correctPath = path.join(repoDir, '.worktrees', 'wt-nested-config');
-      const incorrectPath = path.join(worktreePath, '.worktrees', 'wt-nested-config');
+      const correctPath = path.join(repoDir, '.worktrees', 'nested-config');
+      const incorrectPath = path.join(worktreePath, '.worktrees', 'nested-config');
       
       const correctExists = await fs.access(correctPath).then(() => true).catch(() => false);
       const incorrectExists = await fs.access(incorrectPath).then(() => true).catch(() => false);

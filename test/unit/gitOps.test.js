@@ -50,7 +50,7 @@ describe('GitOps module (integration)', () => {
       // Same basename (for exact file/directory name matches)
       () => comp1.basename && comp1.basename === comp2.basename && comp1.basename !== '',
       
-      // Same last two segments (e.g., ".worktrees/wt-feature")
+      // Same last two segments (e.g., ".worktrees/feature")
       () => comp1.lastTwo && comp1.lastTwo === comp2.lastTwo && comp1.lastTwo !== '',
       
       // Same last three segments
@@ -243,7 +243,7 @@ describe('GitOps module (integration)', () => {
 
   describe('createWorktree', () => {
     test('creates worktree for new branch with base branch', async () => {
-      const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
       
       
       // Ensure the parent directory exists
@@ -267,7 +267,7 @@ describe('GitOps module (integration)', () => {
       await repo.git('checkout -b existing-feature');
       await repo.git('checkout main');
       
-      const worktreePath = path.join(repo.dir, '.worktrees', 'wt-existing');
+      const worktreePath = path.join(repo.dir, '.worktrees', 'existing');
       
       // Ensure the parent directory exists
       await fs.mkdir(path.dirname(worktreePath), { recursive: true });
@@ -283,7 +283,7 @@ describe('GitOps module (integration)', () => {
       await repo.git('checkout -b feature');
       await repo.git('checkout main');
       
-      const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
       
       await expect(gitOps.createWorktree(worktreePath, 'feature', 'main'))
         .rejects.toThrow('Branch \'feature\' already exists');
@@ -292,7 +292,7 @@ describe('GitOps module (integration)', () => {
 
   describe('removeWorktree', () => {
     test('removes worktree', async () => {
-      const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
       await fs.mkdir(path.dirname(worktreePath), { recursive: true });
       await gitOps.createWorktree(worktreePath, 'feature', 'main');
       
@@ -303,7 +303,7 @@ describe('GitOps module (integration)', () => {
     });
 
     test('force removes worktree with uncommitted changes', async () => {
-      const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
       await fs.mkdir(path.dirname(worktreePath), { recursive: true });
       await gitOps.createWorktree(worktreePath, 'feature', 'main');
       
@@ -320,8 +320,8 @@ describe('GitOps module (integration)', () => {
 
   describe('listWorktrees', () => {
     test('returns parsed worktree list', async () => {
-      const wt1 = path.join(repo.dir, '.worktrees', 'wt-feature1');
-      const wt2 = path.join(repo.dir, '.worktrees', 'wt-feature2');
+      const wt1 = path.join(repo.dir, '.worktrees', 'feature1');
+      const wt2 = path.join(repo.dir, '.worktrees', 'feature2');
       
       await fs.mkdir(path.dirname(wt1), { recursive: true });
       await gitOps.createWorktree(wt1, 'feature1', 'main');
@@ -366,7 +366,7 @@ describe('GitOps module (integration)', () => {
 
   describe('hasUncommittedChanges', () => {
     test('returns true when there are uncommitted changes', async () => {
-      const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
       await gitOps.createWorktree(worktreePath, 'feature', 'main');
       
       // Add uncommitted changes - using fs directly to ensure it's written
@@ -380,7 +380,7 @@ describe('GitOps module (integration)', () => {
     });
 
     test('returns false when working directory is clean', async () => {
-      const worktreePath = path.join(repo.dir, '.worktrees', 'wt-feature');
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
       await gitOps.createWorktree(worktreePath, 'feature', 'main');
       
       const result = await gitOps.hasUncommittedChanges(worktreePath);
@@ -423,6 +423,424 @@ describe('GitOps module (integration)', () => {
       
       const fileExists = await repo.exists('feature.txt');
       expect(fileExists).toBe(true);
+    });
+
+    test('throws error when merge fails', async () => {
+      // Create conflicting branches
+      await repo.writeFile('conflict.txt', 'main content');
+      await repo.git('add conflict.txt');
+      await repo.git('commit -m "Main commit"');
+      
+      await repo.git('checkout -b feature');
+      await repo.writeFile('conflict.txt', 'feature content');
+      await repo.git('add conflict.txt');
+      await repo.git('commit -m "Feature commit"');
+      
+      await repo.git('checkout main');
+      await repo.writeFile('conflict.txt', 'different main content');
+      await repo.git('add conflict.txt');
+      await repo.git('commit -m "Conflicting main commit"');
+      
+      // Attempt merge should fail
+      await expect(gitOps.mergeBranch('feature', 'main'))
+        .rejects.toThrow('There are conflicts');
+    });
+  });
+
+  describe('deleteBranch', () => {
+    test('deletes branch', async () => {
+      await repo.git('checkout -b feature');
+      await repo.git('checkout main');
+      
+      await gitOps.deleteBranch('feature');
+      
+      const branches = await repo.git('branch');
+      expect(branches.stdout).not.toContain('feature');
+    });
+
+    test('force deletes branch with unmerged commits', async () => {
+      await repo.git('checkout -b feature');
+      await repo.writeFile('unmerged.txt', 'content');
+      await repo.git('add unmerged.txt');
+      await repo.git('commit -m "Unmerged commit"');
+      await repo.git('checkout main');
+      
+      // Regular delete should fail, but force should work
+      await gitOps.deleteBranch('feature', true);
+      
+      const branches = await repo.git('branch');
+      expect(branches.stdout).not.toContain('feature');
+    });
+
+    test('throws error when branch deletion fails', async () => {
+      // Try to delete current branch (which should fail)
+      await expect(gitOps.deleteBranch('main'))
+        .rejects.toThrow(/delete branch main/);
+    });
+  });
+
+  describe('fetch', () => {
+    test('fetches from remote', async () => {
+      // Add a fake remote
+      await repo.git('remote add origin https://example.com/repo.git');
+      
+      // Mock the fetch to succeed
+      const originalFetch = gitOps.git.fetch;
+      gitOps.git.fetch = jest.fn().mockResolvedValue();
+      
+      await gitOps.fetch();
+      
+      expect(gitOps.git.fetch).toHaveBeenCalled();
+      
+      // Restore
+      gitOps.git.fetch = originalFetch;
+    });
+  });
+
+  describe('checkRemoteBranchExists', () => {
+    test('returns true when remote branch exists', async () => {
+      // Mock git.branch to return remote branches
+      const originalBranch = gitOps.git.branch;
+      gitOps.git.branch = jest.fn().mockResolvedValue({
+        all: ['origin/main', 'origin/feature'],
+        branches: {},
+        current: 'main'
+      });
+      
+      const result = await gitOps.checkRemoteBranchExists('feature');
+      expect(result).toBe(true);
+      
+      // Restore
+      gitOps.git.branch = originalBranch;
+    });
+
+    test('returns false when remote branch does not exist', async () => {
+      // Mock git.branch to return no remote branches
+      const originalBranch = gitOps.git.branch;
+      gitOps.git.branch = jest.fn().mockResolvedValue({
+        all: ['origin/main'],
+        branches: {},
+        current: 'main'
+      });
+      
+      const result = await gitOps.checkRemoteBranchExists('nonexistent');
+      expect(result).toBe(false);
+      
+      // Restore
+      gitOps.git.branch = originalBranch;
+    });
+  });
+
+  describe('push', () => {
+    test('pushes branch to remote', async () => {
+      // Mock the push
+      const originalPush = gitOps.git.push;
+      gitOps.git.push = jest.fn().mockResolvedValue();
+      
+      await gitOps.push('feature');
+      
+      expect(gitOps.git.push).toHaveBeenCalledWith('origin', 'feature');
+      
+      // Restore
+      gitOps.git.push = originalPush;
+    });
+
+    test('pushes branch with --set-upstream', async () => {
+      // Mock the push
+      const originalPush = gitOps.git.push;
+      gitOps.git.push = jest.fn().mockResolvedValue();
+      
+      await gitOps.push('feature', true);
+      
+      expect(gitOps.git.push).toHaveBeenCalledWith(['--set-upstream', 'origin', 'feature']);
+      
+      // Restore
+      gitOps.git.push = originalPush;
+    });
+
+    test('throws error when push fails', async () => {
+      // Mock the push to fail
+      const originalPush = gitOps.git.push;
+      gitOps.git.push = jest.fn().mockRejectedValue(new Error('Push failed'));
+      
+      await expect(gitOps.push('feature'))
+        .rejects.toThrow(/push branch feature to remote/);
+      
+      // Restore
+      gitOps.git.push = originalPush;
+    });
+  });
+
+  describe('pull', () => {
+    test('pulls changes', async () => {
+      // Mock the pull
+      const originalPull = gitOps.git.pull;
+      gitOps.git.pull = jest.fn().mockResolvedValue();
+      
+      await gitOps.pull();
+      
+      expect(gitOps.git.pull).toHaveBeenCalledWith();
+      
+      // Restore
+      gitOps.git.pull = originalPull;
+    });
+
+    test('pulls specific branch', async () => {
+      // Mock the pull
+      const originalPull = gitOps.git.pull;
+      gitOps.git.pull = jest.fn().mockResolvedValue();
+      
+      await gitOps.pull('feature');
+      
+      expect(gitOps.git.pull).toHaveBeenCalledWith('origin', 'feature');
+      
+      // Restore
+      gitOps.git.pull = originalPull;
+    });
+
+    test('throws error when pull fails', async () => {
+      // Mock the pull to fail
+      const originalPull = gitOps.git.pull;
+      gitOps.git.pull = jest.fn().mockRejectedValue(new Error('Pull failed'));
+      
+      await expect(gitOps.pull('feature'))
+        .rejects.toThrow(/pull changes for feature/);
+      
+      // Restore
+      gitOps.git.pull = originalPull;
+    });
+  });
+
+  describe('isWorktreePath', () => {
+    test('returns true for worktree path', () => {
+      const result = gitOps.isWorktreePath('/repo/.worktrees/feature');
+      expect(result).toBe(true);
+    });
+
+    test('returns false for non-worktree path', () => {
+      const result = gitOps.isWorktreePath('/repo/src');
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('getMainBranch', () => {
+    test('returns configured main branch', async () => {
+      const config = { mainBranch: 'master' };
+      const result = await gitOps.getMainBranch(config);
+      expect(result).toBe('master');
+    });
+
+    test('defaults to main when not configured', async () => {
+      const config = {};
+      const result = await gitOps.getMainBranch(config);
+      expect(result).toBe('main');
+    });
+  });
+
+  describe('hasUnpushedCommits', () => {
+    test('returns true when there are unpushed commits', async () => {
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
+      await gitOps.createWorktree(worktreePath, 'feature', 'main');
+      
+      // Add a commit in the worktree
+      const testFile = path.join(worktreePath, 'test.txt');
+      await fs.writeFile(testFile, 'test content');
+      await repo.git(`-C ${worktreePath} add test.txt`);
+      await repo.git(`-C ${worktreePath} commit -m "Test commit"`);
+      
+      // Mock to simulate having upstream and unpushed commits
+      const originalRaw = gitOps.git.raw;
+      gitOps.git.raw = jest.fn()
+        .mockResolvedValueOnce('commit1\ncommit2'); // Return non-empty for unpushed commits
+      
+      const result = await gitOps.hasUnpushedCommits(worktreePath);
+      expect(result).toBe(true);
+      
+      // Restore
+      gitOps.git.raw = originalRaw;
+    });
+
+    test('returns false when there are no unpushed commits', async () => {
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
+      await gitOps.createWorktree(worktreePath, 'feature', 'main');
+      
+      // Mock to simulate no unpushed commits
+      const originalRaw = gitOps.git.raw;
+      gitOps.git.raw = jest.fn().mockResolvedValueOnce(''); // Return empty for no unpushed commits
+      
+      const result = await gitOps.hasUnpushedCommits(worktreePath);
+      expect(result).toBe(false);
+      
+      // Restore
+      gitOps.git.raw = originalRaw;
+    });
+
+    test('returns false when no upstream branch configured', async () => {
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
+      await gitOps.createWorktree(worktreePath, 'feature', 'main');
+      
+      // Mock to simulate no upstream error
+      const originalRaw = gitOps.git.raw;
+      const noUpstreamError = new Error('fatal: no upstream configured');
+      noUpstreamError.message = 'fatal: no upstream configured';
+      gitOps.git.raw = jest.fn().mockRejectedValueOnce(noUpstreamError);
+      
+      const result = await gitOps.hasUnpushedCommits(worktreePath);
+      expect(result).toBe(false);
+      
+      // Restore
+      gitOps.git.raw = originalRaw;
+    });
+
+    test('throws error for other git errors', async () => {
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
+      await gitOps.createWorktree(worktreePath, 'feature', 'main');
+      
+      // Mock to simulate other error
+      const originalRaw = gitOps.git.raw;
+      gitOps.git.raw = jest.fn().mockRejectedValueOnce(new Error('Other git error'));
+      
+      await expect(gitOps.hasUnpushedCommits(worktreePath))
+        .rejects.toThrow('Other git error');
+      
+      // Restore
+      gitOps.git.raw = originalRaw;
+    });
+  });
+
+  describe('getWorktreeInfo', () => {
+    test('returns worktree information', async () => {
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
+      await gitOps.createWorktree(worktreePath, 'feature', 'main');
+      
+      // Add some changes
+      const testFile = path.join(worktreePath, 'test.txt');
+      await fs.writeFile(testFile, 'test content');
+      
+      const info = await gitOps.getWorktreeInfo(worktreePath);
+      
+      expect(info).toHaveProperty('branch', 'feature');
+      expect(info).toHaveProperty('modified');
+      expect(info).toHaveProperty('ahead');
+      expect(info).toHaveProperty('behind');
+      expect(info).toHaveProperty('uncommitted', true);
+      expect(info).toHaveProperty('lastCommit');
+    });
+  });
+
+  describe('ensureGit', () => {
+    test('initializes git when not already initialized', async () => {
+      // Reset git instance
+      gitOps.git = null;
+      gitOps.mainRoot = null;
+      
+      const git = await gitOps.ensureGit();
+      
+      expect(git).toBeDefined();
+      expect(gitOps.git).toBe(git);
+    });
+
+    test('returns existing git instance when already initialized', async () => {
+      // Ensure git is initialized
+      const firstGit = await gitOps.ensureGit();
+      const secondGit = await gitOps.ensureGit();
+      
+      expect(firstGit).toBe(secondGit);
+    });
+
+    test('handles rootFinder error and uses current directory', async () => {
+      // Reset git instance
+      gitOps.git = null;
+      gitOps.mainRoot = null;
+      
+      // Mock rootFinder to throw error
+      const rootFinder = require('../../lib/rootFinder');
+      const originalGetMainRepoRoot = rootFinder.getMainRepoRoot;
+      rootFinder.getMainRepoRoot = jest.fn().mockRejectedValue(new Error('No root found'));
+      
+      const git = await gitOps.ensureGit();
+      
+      expect(git).toBeDefined();
+      expect(rootFinder.getMainRepoRoot).toHaveBeenCalled();
+      
+      // Restore
+      rootFinder.getMainRepoRoot = originalGetMainRepoRoot;
+    });
+  });
+
+  describe('createWorktree error handling', () => {
+    test('translates git error when worktree creation fails', async () => {
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
+      
+      // Mock git.raw to throw error
+      const originalRaw = gitOps.git.raw;
+      gitOps.git.raw = jest.fn().mockRejectedValue(new Error('worktree add failed'));
+      
+      await expect(gitOps.createWorktree(worktreePath, 'feature', 'main'))
+        .rejects.toThrow(/create worktree/);
+      
+      // Restore
+      gitOps.git.raw = originalRaw;
+    });
+  });
+
+  describe('removeWorktree error handling', () => {
+    test('translates git error when worktree removal fails', async () => {
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
+      
+      // Mock git.raw to throw error
+      const originalRaw = gitOps.git.raw;
+      gitOps.git.raw = jest.fn().mockRejectedValue(new Error('worktree remove failed'));
+      
+      await expect(gitOps.removeWorktree(worktreePath))
+        .rejects.toThrow(/remove worktree/);
+      
+      // Restore
+      gitOps.git.raw = originalRaw;
+    });
+  });
+
+  describe('listWorktrees error handling', () => {
+    test('translates git error when listing worktrees fails', async () => {
+      // Mock git.raw to throw error
+      const originalRaw = gitOps.git.raw;
+      gitOps.git.raw = jest.fn().mockRejectedValue(new Error('worktree list failed'));
+      
+      await expect(gitOps.listWorktrees())
+        .rejects.toThrow(/list worktrees/);
+      
+      // Restore
+      gitOps.git.raw = originalRaw;
+    });
+  });
+
+  describe('hasUncommittedChanges error handling', () => {
+    test('translates git error when checking uncommitted changes fails', async () => {
+      const worktreePath = path.join(repo.dir, '.worktrees', 'feature');
+      
+      // Mock git.raw to throw error
+      const originalRaw = gitOps.git.raw;
+      gitOps.git.raw = jest.fn().mockRejectedValue(new Error('git status failed'));
+      
+      await expect(gitOps.hasUncommittedChanges(worktreePath))
+        .rejects.toThrow(/check for uncommitted changes/);
+      
+      // Restore
+      gitOps.git.raw = originalRaw;
+    });
+  });
+
+  describe('checkBranchExists error handling', () => {
+    test('translates git error when checking branch existence fails', async () => {
+      // Mock git.branch to throw error
+      const originalBranch = gitOps.git.branch;
+      gitOps.git.branch = jest.fn().mockRejectedValue(new Error('git branch failed'));
+      
+      await expect(gitOps.checkBranchExists('feature'))
+        .rejects.toThrow(/check if branch feature exists/);
+      
+      // Restore
+      gitOps.git.branch = originalBranch;
     });
   });
 });

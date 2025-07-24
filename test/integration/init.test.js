@@ -30,18 +30,14 @@ describe('wt init command', () => {
     const config = JSON.parse(await repo.readFile('.worktree-config.json'));
     expect(config).toMatchObject({
       baseDir: '.worktrees',
-      mainBranch: 'main',
-      namePattern: 'wt-{branch}'
+      mainBranch: expect.stringMatching(/^(main|master|trunk|development)$/),
+      namePattern: '{branch}'
     });
     
-    // Verify .gitignore was updated (if implementation does this)
-    // Some implementations might not update .gitignore
-    try {
-      const gitignore = await repo.readFile('.gitignore');
-      expect(gitignore).toContain('.worktrees');
-    } catch (error) {
-      // .gitignore might not exist or not be updated
-    }
+    // Verify .gitignore was updated
+    const gitignore = await repo.readFile('.gitignore');
+    expect(gitignore).not.toContain('.worktree-config.json'); // Config should be committed, not ignored
+    expect(gitignore).toContain('.worktrees/');
   });
 
   test('handles already initialized state', async () => {
