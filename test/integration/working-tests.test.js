@@ -58,8 +58,8 @@ describe('Git Worktree Tool - Working Tests', () => {
     const result = await repo.run('ports');
     
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('test-feature');
-    expect(result.stdout).toContain('vite:');
+    // New concise output shows summary 
+    expect(result.stdout).toContain('wt ports: 1 worktrees using');
   });
 
   test('switch command returns path', async () => {

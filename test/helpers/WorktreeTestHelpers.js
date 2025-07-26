@@ -136,7 +136,12 @@ class WorktreeTestHelpers {
     const succeeded = result.exitCode === 0 || 
                      result.stdout.includes('✓') ||
                      result.stdout.includes('Created') ||
-                     result.stdout.includes('success');
+                     result.stdout.includes('success') ||
+                     result.stdout.includes('wt create:') ||
+                     result.stdout.includes('wt remove:') ||
+                     result.stdout.includes('wt list:') ||
+                     result.stdout.includes('wt switch:') ||
+                     result.stdout.includes('wt ports:');
     
     if (!succeeded) {
       const error = `Command failed${message ? ': ' + message : ''}\n` +

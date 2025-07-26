@@ -1,7 +1,15 @@
 const fs = require('fs-extra');
 const path = require('path');
+const gitTemplateCache = require('./helpers/git-template-cache');
 
 module.exports = async () => {
+  // Clean up git template cache
+  try {
+    await gitTemplateCache.cleanup();
+  } catch (error) {
+    console.warn('Warning: Could not clean up git template cache:', error.message);
+  }
+  
   // Final cleanup of test directory if needed
   if (global.__TEST_DIR__) {
     try {

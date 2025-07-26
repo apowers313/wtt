@@ -4,7 +4,7 @@ const os = require('os');
 const { spawn, execSync } = require('child_process');
 
 // Detect if we're in a CI environment
-const isCI = process.env.CI || process.env.GITHUB_ACTIONS || process.env.TRAVIS || process.env.CIRCLECI;
+const isCI = !!(process.env.CI || process.env.GITHUB_ACTIONS || process.env.TRAVIS || process.env.CIRCLECI);
 const TEST_TIMEOUT = isCI ? 5000 : 10000;
 const PROMPT_WAIT = isCI ? 200 : 500;
 

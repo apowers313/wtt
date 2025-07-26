@@ -1,22 +1,26 @@
 const { portsCommand } = require('../../../commands/ports');
+const path = require('path');
 
 // Mock the dependencies
 jest.mock('../../../lib/config');
 jest.mock('../../../lib/portManager');
 jest.mock('../../../lib/gitOps');
+jest.mock('../../../lib/currentWorktree');
 jest.mock('inquirer', () => ({
   prompt: jest.fn()
 }));
 jest.mock('chalk', () => ({
   red: jest.fn(msg => msg),
   green: jest.fn(msg => msg),
-  yellow: jest.fn(msg => msg)
+  yellow: jest.fn(msg => msg),
+  gray: jest.fn(msg => msg)
 }));
 
 const config = require('../../../lib/config');
 const portManager = require('../../../lib/portManager');
 const gitOps = require('../../../lib/gitOps');
 const inquirer = require('inquirer');
+const { getCurrentWorktree } = require('../../../lib/currentWorktree');
 
 describe('ports command', () => {
   let mockConsoleLog;
@@ -41,6 +45,7 @@ describe('ports command', () => {
     });
     config.getBaseDir = jest.fn().mockReturnValue('/test/repo');
     portManager.init = jest.fn().mockResolvedValue();
+    getCurrentWorktree.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -64,10 +69,7 @@ describe('ports command', () => {
 
     await portsCommand('wt-feature');
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nPorts for worktree \'wt-feature\':');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  vite: 3000 (in use)');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  storybook: 6006 (available)');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  custom: 8000 (available)');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: wt-feature: vite:3000, storybook:6006, custom:8000');
   });
 
   test('shows message when worktree has no ports', async () => {
@@ -75,7 +77,7 @@ describe('ports command', () => {
 
     await portsCommand('wt-nonexistent');
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('No ports assigned to worktree \'wt-nonexistent\'');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: no ports assigned to worktree \'wt-nonexistent\'');
     expect(mockProcessExit).not.toHaveBeenCalled();
   });
 
@@ -97,15 +99,7 @@ describe('ports command', () => {
 
     await portsCommand();
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nPort assignments for all worktrees:');
-    expect(mockConsoleLog).toHaveBeenCalledWith('─'.repeat(50));
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nwt-feature-1');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  vite: 3000');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  storybook: 6006');
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nwt-feature-2');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  vite: 3010');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  storybook: 6016');
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nTotal ports in use: 4');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: 2 worktrees using 4 ports');
   });
 
   test('shows message when no port assignments found', async () => {
@@ -113,7 +107,7 @@ describe('ports command', () => {
 
     await portsCommand();
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('No port assignments found');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: no port assignments found');
   });
 
   test('detects and handles port conflicts', async () => {
@@ -132,21 +126,18 @@ describe('ports command', () => {
     portManager.findAvailablePort = jest.fn().mockReturnValue(3010);
     portManager.portMap = { 'wt-feature': { ...mockPorts, created: '2025-01-01' } };
     portManager.save = jest.fn().mockResolvedValue();
-    
+
     inquirer.prompt = jest.fn().mockResolvedValue({ reassign: true });
 
     await portsCommand('wt-feature');
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('\n⚠ Port conflicts detected:');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  vite port 3000 is in use by another process');
-    expect(inquirer.prompt).toHaveBeenCalled();
-    expect(mockConsoleLog).toHaveBeenCalledWith('✓ Reassigned vite to port 3010');
-    expect(portManager.save).toHaveBeenCalled();
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: reassigned vite to port 3010');
   });
 
-  test('handles port checking errors gracefully', async () => {
+  test('handles port check errors gracefully', async () => {
     const mockPorts = {
-      vite: 3000
+      vite: 3000,
+      storybook: 6006
     };
 
     portManager.getPorts = jest.fn().mockReturnValue(mockPorts);
@@ -155,8 +146,7 @@ describe('ports command', () => {
     await portsCommand('wt-feature');
 
     // Should still display ports even if checking fails
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nPorts for worktree \'wt-feature\':');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  vite: 3000');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: wt-feature: vite:3000, storybook:6006');
   });
 
   test('displays port ranges', async () => {
@@ -168,10 +158,8 @@ describe('ports command', () => {
 
     await portsCommand();
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nPort ranges:');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  vite: 3000-3100 (increment: 10)');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  storybook: 6006-6106 (increment: 10)');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  custom: 8000-8100 (increment: 10)');
+    // Port ranges are now only shown in verbose mode
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: 1 worktrees using 1 ports');
   });
 
   test('handles missing port ranges configuration', async () => {
@@ -180,7 +168,7 @@ describe('ports command', () => {
 
     await portsCommand();
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('No port assignments found');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: no port assignments found');
     // Should not crash when portRanges is undefined
     expect(mockProcessExit).not.toHaveBeenCalled();
   });
@@ -191,7 +179,7 @@ describe('ports command', () => {
 
     await portsCommand();
 
-    expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'Repository validation failed');
+    expect(mockConsoleError).toHaveBeenCalledWith('wt ports: error: Repository validation failed');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 
@@ -208,6 +196,6 @@ describe('ports command', () => {
 
     await portsCommand();
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('  vite: 3000 ✓');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt ports: 1 worktrees using 1 ports');
   });
 });

@@ -12,7 +12,8 @@ jest.mock('fs', () => ({
   promises: {
     readFile: jest.fn(),
     writeFile: jest.fn(),
-    unlink: jest.fn()
+    unlink: jest.fn(),
+    rename: jest.fn()
   }
 }));
 jest.mock('inquirer');
@@ -21,6 +22,7 @@ jest.mock('../../../lib/ui/conflict-ui');
 jest.mock('../../../lib/merge-helper/progress-tracker');
 jest.mock('../../../lib/merge-helper/conflict-detector');
 jest.mock('simple-git');
+jest.mock('../../../lib/gitOps');
 
 describe('ConflictResolver', () => {
   let resolver;
@@ -155,6 +157,8 @@ describe('ConflictResolver', () => {
 
   describe('resolveFile', () => {
     it('should display no conflicts message when file has no conflicts', async () => {
+      // Mock readFile to return text content (not binary)
+      fs.readFile.mockResolvedValue(Buffer.from('console.log("hello");'));
       mockDetector.analyzeFileConflicts.mockResolvedValue({ count: 0, conflicts: [] });
       
       await resolver.resolveFile('file.js');
@@ -162,7 +166,6 @@ describe('ConflictResolver', () => {
       expect(mockConsoleLog).toHaveBeenCalledWith(
         chalk.yellow('No conflicts found in file.js')
       );
-      expect(fs.readFile).not.toHaveBeenCalled();
     });
 
     it('should resolve conflicts in a file', async () => {
@@ -443,6 +446,330 @@ describe('ConflictResolver', () => {
       expect(mockConsoleLog).toHaveBeenCalledWith(
         chalk.yellow('\n⚠️  2 conflict(s) still remain in file.js')
       );
+    });
+
+    it('should use custom tool command when provided', async () => {
+      const mockChild = {
+        on: jest.fn((event, callback) => {
+          if (event === 'exit') callback(0);
+        })
+      };
+      spawn.mockReturnValue(mockChild);
+      mockDetector.analyzeFileConflicts.mockResolvedValue({ count: 0, conflicts: [] });
+      
+      await resolver.resolveWithTool('file.js', 'customtool --flags');
+      
+      expect(spawn).toHaveBeenCalledWith('customtool --flags', ['file.js'], { 
+        shell: true,
+        stdio: 'inherit' 
+      });
+    });
+
+    it('should handle spawn error', async () => {
+      const mockChild = {
+        on: jest.fn((event, callback) => {
+          if (event === 'error') callback(new Error('Spawn failed'));
+        })
+      };
+      spawn.mockReturnValue(mockChild);
+      
+      await expect(resolver.resolveWithTool('file.js', 'vscode'))
+        .rejects.toThrow('Spawn failed');
+    });
+
+    it('should reject when user declines to continue with unresolved conflicts', async () => {
+      const mockChild = {
+        on: jest.fn((event, callback) => {
+          if (event === 'exit') callback(0);
+        })
+      };
+      spawn.mockReturnValue(mockChild);
+      
+      mockDetector.analyzeFileConflicts.mockResolvedValue({ 
+        count: 1, 
+        conflicts: [{ startLine: 10, endLine: 20 }] 
+      });
+      
+      inquirer.prompt.mockResolvedValue({ continueWithFile: false });
+      
+      await expect(resolver.resolveWithTool('file.js', 'vscode'))
+        .rejects.toThrow('Conflicts not fully resolved');
+    });
+  });
+
+  describe('isBinaryFile', () => {
+    it('should detect binary files by null bytes', async () => {
+      const binaryBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x00, 0x0A]); // PNG-like with null byte
+      fs.readFile.mockResolvedValue(binaryBuffer);
+      
+      const result = await resolver.isBinaryFile('image.png');
+      
+      expect(result).toBe(true);
+    });
+
+    it('should detect binary files by extension', async () => {
+      const textBuffer = Buffer.from('console.log("hello");');
+      fs.readFile.mockResolvedValue(textBuffer);
+      
+      const result = await resolver.isBinaryFile('image.jpg');
+      
+      expect(result).toBe(true);
+    });
+
+    it('should detect text files correctly', async () => {
+      const textBuffer = Buffer.from('console.log("hello world");');
+      fs.readFile.mockResolvedValue(textBuffer);
+      
+      const result = await resolver.isBinaryFile('script.js');
+      
+      expect(result).toBe(false);
+    });
+
+    it('should return true when file cannot be read', async () => {
+      fs.readFile.mockRejectedValue(new Error('File not found'));
+      
+      const result = await resolver.isBinaryFile('missing.txt');
+      
+      expect(result).toBe(true);
+    });
+
+    it('should handle various binary extensions', async () => {
+      const textBuffer = Buffer.from('text content');
+      fs.readFile.mockResolvedValue(textBuffer);
+      
+      const binaryExtensions = ['.pdf', '.exe', '.zip', '.mp3', '.ttf'];
+      
+      for (const ext of binaryExtensions) {
+        const result = await resolver.isBinaryFile(`file${ext}`);
+        expect(result).toBe(true);
+      }
+    });
+  });
+
+  describe('resolveBinaryConflict', () => {
+    beforeEach(() => {
+      const mockGitOps = require('../../../lib/gitOps');
+      mockGitOps.ensureGit = jest.fn().mockResolvedValue(mockGit);
+    });
+
+    it('should resolve binary conflict by keeping ours', async () => {
+      mockGit.show = jest.fn()
+        .mockResolvedValueOnce('our content')
+        .mockResolvedValueOnce('their content');
+      
+      inquirer.prompt.mockResolvedValue({ resolution: 'ours' });
+      
+      await resolver.resolveBinaryConflict('binary.png');
+      
+      expect(mockGit.checkout).toHaveBeenCalledWith(['--ours', 'binary.png']);
+      expect(mockGit.add).toHaveBeenCalledWith('binary.png');
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        chalk.green('✅ Kept your version of binary.png')
+      );
+    });
+
+    it('should resolve binary conflict by keeping theirs', async () => {
+      mockGit.show = jest.fn()
+        .mockResolvedValueOnce('our content')
+        .mockResolvedValueOnce('their content');
+      
+      inquirer.prompt.mockResolvedValue({ resolution: 'theirs' });
+      
+      await resolver.resolveBinaryConflict('binary.png');
+      
+      expect(mockGit.checkout).toHaveBeenCalledWith(['--theirs', 'binary.png']);
+      expect(mockGit.add).toHaveBeenCalledWith('binary.png');
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        chalk.green('✅ Kept their version of binary.png')
+      );
+    });
+
+    it('should resolve binary conflict by keeping both versions', async () => {
+      mockGit.show = jest.fn()
+        .mockResolvedValueOnce('our content')
+        .mockResolvedValueOnce('their content');
+      
+      inquirer.prompt.mockResolvedValue({ resolution: 'both' });
+      mockGit.rm = jest.fn();
+      fs.rename = jest.fn();
+      
+      await resolver.resolveBinaryConflict('path/to/file.png');
+      
+      expect(mockGit.checkout).toHaveBeenCalledWith(['--ours', 'path/to/file.png']);
+      expect(fs.rename).toHaveBeenCalledWith('path/to/file.png', 'path/to/file.ours.png');
+      expect(mockGit.checkout).toHaveBeenCalledWith(['--theirs', 'path/to/file.png']);
+      expect(fs.rename).toHaveBeenCalledWith('path/to/file.png', 'path/to/file.theirs.png');
+      expect(mockGit.rm).toHaveBeenCalledWith('path/to/file.png');
+      expect(mockGit.add).toHaveBeenCalledWith(['path/to/file.ours.png', 'path/to/file.theirs.png']);
+    });
+
+    it('should resolve binary conflict by deleting file', async () => {
+      mockGit.show = jest.fn()
+        .mockResolvedValueOnce('our content')
+        .mockResolvedValueOnce('their content');
+      
+      inquirer.prompt.mockResolvedValue({ resolution: 'delete' });
+      mockGit.rm = jest.fn();
+      
+      await resolver.resolveBinaryConflict('binary.png');
+      
+      expect(mockGit.rm).toHaveBeenCalledWith('binary.png');
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        chalk.green('✅ Deleted binary.png')
+      );
+    });
+
+    it('should handle skip resolution', async () => {
+      mockGit.show = jest.fn()
+        .mockResolvedValueOnce('our content')
+        .mockResolvedValueOnce('their content');
+      
+      inquirer.prompt.mockResolvedValue({ resolution: 'skip' });
+      
+      await resolver.resolveBinaryConflict('binary.png');
+      
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        chalk.yellow('⏭️  Skipped binary.png')
+      );
+      expect(mockGit.checkout).not.toHaveBeenCalled();
+    });
+
+    it('should handle git show errors gracefully', async () => {
+      mockGit.show = jest.fn().mockRejectedValue(new Error('Git show failed'));
+      inquirer.prompt.mockResolvedValue({ resolution: 'ours' });
+      
+      await resolver.resolveBinaryConflict('binary.png');
+      
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        chalk.gray('  Your version (ours): size unknown')
+      );
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        chalk.gray('  Their version (theirs): size unknown')
+      );
+    });
+  });
+
+  describe('applyResolution', () => {
+    it('should apply resolution to file content correctly', async () => {
+      const content = 'line1\nline2\nconflict area\nline4\nline5';
+      const conflict = { startLine: 3, endLine: 3 };
+      const resolution = { content: 'resolved line' };
+      
+      const result = await resolver.applyResolution(content, conflict, resolution);
+      
+      expect(result).toBe('line1\nline2\nresolved line\nline4\nline5');
+    });
+
+    it('should handle multi-line resolutions', async () => {
+      const content = 'line1\nconflict\nline3';
+      const conflict = { startLine: 2, endLine: 2 };
+      const resolution = { content: 'resolved line 1\nresolved line 2' };
+      
+      const result = await resolver.applyResolution(content, conflict, resolution);
+      
+      expect(result).toBe('line1\nresolved line 1\nresolved line 2\nline3');
+    });
+  });
+
+  describe('generateResolutionOptions', () => {
+    it('should generate basic resolution options', () => {
+      const conflict = {
+        ours: ['our code'],
+        theirs: ['their code']
+      };
+      
+      const options = resolver.generateResolutionOptions(conflict);
+      
+      expect(options).toHaveLength(6);
+      expect(options[0]).toMatchObject({
+        label: 'Keep your version',
+        action: 'keep_ours',
+        content: 'our code'
+      });
+      expect(options[1]).toMatchObject({
+        label: 'Keep team\'s version',
+        action: 'keep_theirs',
+        content: 'their code'
+      });
+    });
+
+    it('should include smart options from generateSmartOptions', () => {
+      const conflict = {
+        ours: ['const timeout = 5000'],
+        theirs: ['const timeout = 3000']
+      };
+      
+      resolver.generateSmartOptions = jest.fn().mockReturnValue([
+        { label: 'Smart option', action: 'smart' }
+      ]);
+      
+      const options = resolver.generateResolutionOptions(conflict);
+      
+      expect(resolver.generateSmartOptions).toHaveBeenCalledWith(conflict);
+      expect(options.find(opt => opt.action === 'smart')).toBeTruthy();
+    });
+  });
+
+  describe('presentConflictOptions', () => {
+    it('should handle custom resolution action', async () => {
+      const conflict = {
+        file: 'test.js',
+        startLine: 10,
+        ours: ['our code'],
+        theirs: ['their code']
+      };
+      
+      resolver.ui.showConflict = jest.fn();
+      resolver.generateResolutionOptions = jest.fn().mockReturnValue([]);
+      resolver.ui.promptForChoice = jest.fn().mockResolvedValue({ action: 'custom' });
+      resolver.getCustomResolution = jest.fn().mockResolvedValue('custom content');
+      
+      const result = await resolver.presentConflictOptions(conflict);
+      
+      expect(resolver.getCustomResolution).toHaveBeenCalledWith(conflict);
+      expect(result.content).toBe('custom content');
+    });
+
+    it('should handle view_context action', async () => {
+      const conflict = { 
+        file: 'test.js', 
+        startLine: 10,
+        ours: ['our code'],
+        theirs: ['their code']
+      };
+      
+      resolver.ui.showConflict = jest.fn();
+      resolver.generateResolutionOptions = jest.fn().mockReturnValue([]);
+      resolver.ui.promptForChoice = jest.fn()
+        .mockResolvedValueOnce({ action: 'view_context' })
+        .mockResolvedValueOnce({ action: 'keep_ours', content: 'final choice' });
+      resolver.showExtendedContext = jest.fn();
+      
+      const result = await resolver.presentConflictOptions(conflict);
+      
+      expect(resolver.showExtendedContext).toHaveBeenCalledWith(conflict);
+      expect(result.content).toBe('final choice');
+    });
+
+    it('should handle help action', async () => {
+      const conflict = { 
+        file: 'test.js', 
+        startLine: 10,
+        ours: ['our code'],
+        theirs: ['their code']
+      };
+      
+      resolver.ui.showConflict = jest.fn();
+      resolver.generateResolutionOptions = jest.fn().mockReturnValue([]);
+      resolver.ui.promptForChoice = jest.fn()
+        .mockResolvedValueOnce({ action: 'help' })
+        .mockResolvedValueOnce({ action: 'keep_ours', content: 'final choice' });
+      resolver.showConflictHelp = jest.fn();
+      
+      const result = await resolver.presentConflictOptions(conflict);
+      
+      expect(resolver.showConflictHelp).toHaveBeenCalledWith(conflict);
+      expect(result.content).toBe('final choice');
     });
   });
 });

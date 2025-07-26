@@ -8,10 +8,12 @@ const PathUtils = require('../lib/pathUtils');
 const MessageFormatter = require('../lib/merge-helper/message-formatter');
 const BackupManager = require('../lib/merge-helper/backup-manager');
 const ConflictDetector = require('../lib/merge-helper/conflict-detector');
-const ProgressUI = require('../lib/ui/progress-ui');
+const Output = require('../lib/output');
 const { getCurrentWorktree } = require('../lib/currentWorktree');
+const rootFinder = require('../lib/rootFinder');
 
 async function mergeCommand(worktreeName, options) {
+  const output = new Output(options);
   const messageFormatter = new MessageFormatter();
   
   try {
@@ -22,57 +24,158 @@ async function mergeCommand(worktreeName, options) {
     if (!worktreeName) {
       worktreeName = await getCurrentWorktree();
       if (!worktreeName) {
-        throw new Error('No worktree specified and not currently inside a worktree. Use \'wt list\' to see available worktrees.');
+        output.error('merge', 'no worktree specified and not currently inside a worktree');
+        process.exit(1);
       }
-      console.log(chalk.gray(`Auto-detected current worktree: ${worktreeName}`));
+      output.verboseStep('merge', `auto-detected current worktree: ${worktreeName}`);
+    } else if (options.verbose) {
+      // Also try auto-detection when verbose to show what would have been detected
+      const autoDetected = await getCurrentWorktree();
+      if (autoDetected) {
+        output.verboseStep('merge', `would have auto-detected: ${autoDetected}`);
+      }
+    }
+    
+    // Additional debug info
+    if (options.verbose) {
+      const repoInfo = await rootFinder.findRoot();
+      output.verboseStep('merge', `running from: ${process.cwd()}`);
+      output.verboseStep('merge', `main repo root: ${repoInfo.root}`);
+      if (repoInfo.isWorktree) {
+        output.verboseStep('merge', `in worktree: ${repoInfo.worktreeName}`);
+        output.verboseStep('merge', `worktree path: ${repoInfo.currentWorktreePath}`);
+      }
     }
     
     const backupManager = new BackupManager(config.getBaseDir());
-    
     const cfg = config.get();
     await portManager.init(config.getBaseDir());
     
     // Phase 1: Pre-merge validation
     const validation = await validateMerge(worktreeName, options, cfg);
     if (!validation.safe) {
-      handlePreMergeIssues(validation.issues, messageFormatter);
+      handlePreMergeIssues(validation.issues, messageFormatter, output);
       // handlePreMergeIssues will exit the process
     }
     
     const worktreePath = config.getWorktreePath(worktreeName);
     
-    const worktrees = await gitOps.listWorktrees();
+    // Debug: check if we're getting worktrees
+    let worktrees;
+    try {
+      worktrees = await gitOps.listWorktrees();
+      if (options.verbose) {
+        output.verboseStep('merge', `gitOps.listWorktrees() returned ${worktrees ? worktrees.length : 'null'} worktrees`);
+      }
+    } catch (error) {
+      if (options.verbose) {
+        output.verboseStep('merge', `gitOps.listWorktrees() failed: ${error.message}`);
+      }
+      throw error;
+    }
+    
+    // Debug logging
+    if (options.verbose) {
+      output.verboseStep('merge', `looking for worktree with name: ${worktreeName}`);
+      output.verboseStep('merge', `config.mainRoot: ${config.mainRoot}`);
+      output.verboseStep('merge', `config.baseDir: ${config.get().baseDir}`);
+      output.verboseStep('merge', `expected path: ${worktreePath}`);
+      output.verboseStep('merge', `found ${worktrees.length} worktrees:`);
+      worktrees.forEach(wt => {
+        output.verboseStep('merge', `  - path: ${wt.path}, branch: ${wt.branch}`);
+      });
+    }
     
     // Try multiple matching strategies
-    let worktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
+    let worktree = worktrees.find(wt => {
+      const matches = PathUtils.equals(wt.path, worktreePath);
+      if (options.verbose) {
+        output.verboseStep('merge', `  comparing paths: '${wt.path}' === '${worktreePath}' ? ${matches}`);
+      }
+      return matches;
+    });
     
     if (!worktree) {
       // Fallback: Try matching by worktree name in the path
+      if (options.verbose) {
+        output.verboseStep('merge', 'trying to match by worktree name in path');
+      }
       worktree = worktrees.find(wt => {
         const wtName = path.basename(wt.path);
+        if (options.verbose) {
+          output.verboseStep('merge', `  comparing '${wtName}' with '${worktreeName}'`);
+        }
         return wtName === worktreeName;
       });
     }
     
     if (!worktree) {
+      // Try matching with 'wt-' prefix (legacy naming)
+      if (options.verbose) {
+        output.verboseStep('merge', 'trying to match with wt- prefix');
+      }
+      const legacyName = `wt-${worktreeName}`;
+      worktree = worktrees.find(wt => {
+        const wtName = path.basename(wt.path);
+        return wtName === legacyName;
+      });
+    }
+    
+    if (!worktree) {
       // Last resort: Try matching by branch name directly
+      if (options.verbose) {
+        output.verboseStep('merge', 'trying to match by branch name');
+      }
       worktree = worktrees.find(wt => wt.branch === worktreeName);
     }
     
     if (!worktree) {
-      throw new Error(`Worktree '${worktreeName}' doesn't exist. Use 'wt list' to see available worktrees`);
+      // Additional fallback: check if we're currently in the worktree
+      const repoInfo = await rootFinder.findRoot();
+      if (repoInfo.isWorktree && repoInfo.worktreeName === worktreeName) {
+        // We're in the worktree but it's not in the list - might be a git issue
+        // Try to find it by checking if the current path matches any worktree
+        worktree = worktrees.find(wt => PathUtils.equals(wt.path, repoInfo.currentWorktreePath));
+        if (!worktree) {
+          // Create a synthetic worktree entry
+          const worktreeGit = require('simple-git')(repoInfo.currentWorktreePath);
+          const status = await worktreeGit.status();
+          worktree = {
+            path: repoInfo.currentWorktreePath,
+            branch: status.current,
+            commit: 'HEAD',
+            bare: false,
+            detached: false
+          };
+          if (options.verbose) {
+            output.verboseStep('merge', 'created synthetic worktree entry for current directory');
+          }
+        }
+      }
+    }
+    
+    if (!worktree) {
+      output.error('merge', `worktree '${worktreeName}' not found`);
+      if (options.verbose) {
+        output.verboseStep('merge', 'available worktrees:');
+        worktrees.forEach(wt => {
+          output.verboseStep('merge', `  - ${path.basename(wt.path)} (branch: ${wt.branch})`);
+        });
+      }
+      process.exit(1);
     }
     
     const branchName = worktree.branch;
     if (!branchName) {
-      throw new Error('Unable to determine which branch this worktree is using. The worktree may be in a detached HEAD state or corrupted. Try "wt remove" and recreate it');
+      output.error('merge', 'worktree is in detached HEAD state');
+      process.exit(1);
     }
     
-    console.log(chalk.blue(`Checking worktree '${worktreeName}'...`));
+    output.verboseStep('merge', `checking worktree '${worktreeName}'`);
     
     // If --check option is set, run conflict prediction and exit
     if (options.check) {
-      console.log(chalk.blue('\n🔍 Running merge preview...\n'));
+      output.verboseStep('merge', 'running merge preview');
       
       const ConflictDetector = require('../lib/merge-helper/conflict-detector');
       const detector = new ConflictDetector();
@@ -82,79 +185,35 @@ async function mergeCommand(worktreeName, options) {
       await gitOps.git.cwd(worktreePath);
       const predictions = await detector.predictConflicts(mainBranch);
       
-      console.log(chalk.blue('Merge preview results:\n'));
-      console.log('✅ No uncommitted changes');
-      console.log('✅ Branch is ready to merge');
-      
       if (predictions.length === 0) {
-        console.log(chalk.green('✅ No conflicts predicted'));
-        console.log(chalk.gray('\nThis merge should proceed smoothly.'));
+        output.success('merge', 'no conflicts predicted');
       } else {
-        console.log(chalk.yellow(`⚠️  ${predictions.length} file(s) will have conflicts:`));
-        predictions.forEach(pred => {
-          console.log(chalk.yellow(`   - ${pred.file} (${pred.risk} risk)`));
-          console.log(chalk.gray(`     ${pred.reason}`));
-        });
-        
-        console.log(chalk.cyan('\n💡 To proceed with the actual merge:'));
-        console.log(chalk.gray(`   wt merge ${worktreeName}`));
-      }
-      
-      // Reset cwd
-      await gitOps.git.cwd(process.cwd());
-      return;
-    }
-    
-    // Create safety backup before proceeding
-    await backupManager.createSafetyBackup('merge', {
-      metadata: { worktreeName, branchName, targetBranch: await gitOps.getMainBranch(cfg) }
-    });
-    
-    // Phase 2: Conflict prediction (unless --force is used)
-    if (!options.force) {
-      const detector = new ConflictDetector();
-      const mainBranch = await gitOps.getMainBranch(cfg);
-      
-      // Switch to worktree branch to analyze
-      await gitOps.git.cwd(worktreePath);
-      const predictions = await detector.predictConflicts(mainBranch);
-      await gitOps.git.cwd(process.cwd());
-      
-      if (predictions.length > 0) {
-        console.log(chalk.yellow('\n⚠️  Potential conflicts detected:\n'));
-        predictions.forEach(pred => {
-          console.log(chalk.yellow(`   ${pred.file} (${pred.risk} risk)`));
-          console.log(chalk.gray(`   └─ ${pred.reason}`));
-        });
-        
-        if (!options.yes && process.env.WTT_AUTO_CONFIRM !== 'true') {
-          const { proceed } = await inquirer.prompt([{
-            type: 'confirm',
-            name: 'proceed',
-            message: 'Continue with merge anyway?',
-            default: true
-          }]);
-          
-          if (!proceed) {
-            console.log(chalk.yellow('\nMerge cancelled.'));
-            console.log(chalk.gray('Your backup has been preserved and can be accessed if needed.'));
-            process.exit(0);
-          }
+        output.warning('merge', `${predictions.length} files will have conflicts`);
+        if (options.verbose) {
+          predictions.forEach(pred => {
+            console.log(`   - ${pred.file} (${pred.risk} risk): ${pred.reason}`);
+          });
         }
       }
+      
+      process.exit(0);
     }
+    
+    // Phase 2: Create backup (silently unless verbose)
+    output.verboseStep('merge', 'creating safety backup');
+    const backupId = await createSilentBackup(backupManager, 'merge');
+    output.verboseStep('merge', `backup created: ${backupId}`);
     
     const hasUncommitted = await gitOps.hasUncommittedChanges(worktreePath);
     if (hasUncommitted) {
-      // This should have been caught by pre-merge validation
-      // but check again just in case
-      throw new Error('Worktree has uncommitted changes. Please commit or stash changes before merging');
+      output.error('merge', 'uncommitted changes in worktree');
+      process.exit(1);
     }
-    console.log(chalk.green('✓ No uncommitted changes'));
+    output.verboseStep('merge', 'no uncommitted changes');
     
     const hasUnpushed = await gitOps.hasUnpushedCommits(worktreePath);
     if (hasUnpushed) {
-      console.log(chalk.yellow('⚠ Branch has unpushed commits'));
+      output.verboseStep('merge', 'branch has unpushed commits');
       let shouldPush = true;
       
       // Auto-confirm in test/automation environments, otherwise prompt
@@ -171,52 +230,43 @@ async function mergeCommand(worktreeName, options) {
       if (shouldPush) {
         const worktreeGit = require('simple-git')(worktreePath);
         await worktreeGit.push();
-        console.log(chalk.green('✓ Pushed commits to origin'));
+        output.verboseStep('merge', 'pushed commits to origin');
       }
     } else {
-      console.log(chalk.green('✓ Branch is up to date with origin'));
+      output.verboseStep('merge', 'branch is up to date with origin');
     }
     
     const mainBranch = await gitOps.getMainBranch(cfg);
-    console.log('\n' + chalk.blue(`Merging to ${mainBranch}...`));
     
-    // Phase 3: Execute merge with monitoring
-    const mergeProgress = ProgressUI.displayMergeProgress(branchName, mainBranch, [
-      'Switching to main branch',
-      'Merging changes',
-      'Updating references',
-      'Finalizing merge'
-    ]);
+    // Phase 3: Execute merge
+    output.status('merge', 'merging', `${branchName} → ${mainBranch}`);
     
     try {
-      mergeProgress.updateSection(0, 'in_progress');
-      await gitOps.git.checkout(mainBranch);
-      mergeProgress.updateSection(0, 'completed');
-      console.log(chalk.green(`✓ Switched to branch '${mainBranch}'`));
+      // Get the main repository root
+      const mainRepoRoot = await rootFinder.getMainRepoRoot();
       
-      mergeProgress.updateSection(1, 'in_progress');
-      await gitOps.git.merge([branchName]);
-      mergeProgress.updateSection(1, 'completed');
-      console.log(chalk.green(`✓ Merged '${branchName}'`));
+      // Create a git instance specifically for the main repository
+      const mainGit = require('simple-git')(mainRepoRoot);
       
-      mergeProgress.updateSection(2, 'in_progress');
-      mergeProgress.updateSection(2, 'completed');
+      // First, check what branch the main repository is currently on
+      const status = await mainGit.status();
       
-      mergeProgress.updateSection(3, 'in_progress');
-      mergeProgress.updateSection(3, 'completed');
+      // If we're not on the main branch, we need to switch to it
+      if (status.current !== mainBranch) {
+        await mainGit.checkout(mainBranch);
+      }
       
-      mergeProgress.complete();
+      output.verboseStep('merge', `switched to branch '${mainBranch}'`);
+      
+      await mainGit.merge([branchName]);
+      
+      output.verboseStep('merge', `merged '${branchName}' successfully`);
+      
     } catch (error) {
-      mergeProgress.fail();
-      
       // Check if it's a merge conflict
       if (error.message.includes('CONFLICT') || error.message.includes('fix conflicts')) {
-        console.log(chalk.red('\n❌ Merge failed due to conflicts\n'));
-        console.log(chalk.yellow('The merge resulted in conflicts that need to be resolved.'));
-        console.log(chalk.cyan('\nNext steps:'));
-        console.log(chalk.gray('1. Run "wt conflicts list" to see all conflicts'));
-        console.log(chalk.gray('2. Run "wt conflicts fix" to resolve them interactively'));
-        console.log(chalk.gray('3. Or run "wt merge --abort" to cancel the merge'));
+        const conflictCount = await getConflictCount(error);
+        output.error('merge', `conflicts in ${conflictCount} files (run 'git status' for details)`);
         
         // Store merge state for recovery
         await backupManager.saveMergeState({
@@ -226,13 +276,14 @@ async function mergeCommand(worktreeName, options) {
           conflicted: true,
           timestamp: new Date().toISOString()
         });
+        
+        process.exit(1);
       }
       
       throw error;
     }
     
     // Check if we should clean up based on config or explicit option
-    // When --no-delete is passed, options.delete is explicitly false
     const shouldConsiderCleanup = options.delete === true || (cfg.autoCleanup && options.delete !== false);
     
     if (shouldConsiderCleanup) {
@@ -251,22 +302,28 @@ async function mergeCommand(worktreeName, options) {
       
       if (confirmDelete) {
         await gitOps.removeWorktree(worktreePath);
-        console.log(chalk.green('✓ Removed worktree'));
+        output.verboseStep('merge', 'removed worktree');
         
         try {
           await gitOps.deleteBranch(branchName);
-          console.log(chalk.green(`✓ Deleted branch '${branchName}'`));
+          output.verboseStep('merge', `deleted branch '${branchName}'`);
         } catch (error) {
-          console.log(chalk.yellow('⚠ Could not delete the branch automatically. You can delete it manually later'));
+          output.verboseStep('merge', 'could not delete branch automatically');
         }
         
         const ports = portManager.getPorts(worktreeName);
         if (ports) {
           await portManager.releasePorts(worktreeName);
           const portList = Object.values(ports).join(', ');
-          console.log(chalk.green(`✓ Released ports ${portList}`));
+          output.verboseStep('merge', `released ports ${portList}`);
         }
+        
+        output.success('merge', `merged '${branchName}' into ${mainBranch} and removed worktree`);
+      } else {
+        output.success('merge', `merged '${branchName}' into ${mainBranch}`);
       }
+    } else {
+      output.success('merge', `merged '${branchName}' into ${mainBranch}`);
     }
     
   } catch (error) {
@@ -276,172 +333,119 @@ async function mergeCommand(worktreeName, options) {
       process.exit(1);
     }
     
-    const errorLevel = process.env.WTT_ERROR_LEVEL || 'enhanced';
-    
-    if (errorLevel === 'simple') {
-      // Simple error message
-      console.error('Error:', error.message);
-    } else {
-      // Enhanced error handling with human-friendly messages
-      const formattedError = messageFormatter.formatMergeError(
-        error,
-        await gitOps.getMainBranch(config.get()).catch(() => 'main'),
-        config.get().mergeHelper?.skillLevel || 'beginner'
-      );
-      
-      messageFormatter.displayFormattedError(formattedError, { verbose: options.verbose });
-    }
-    
+    output.error('merge', error.message);
     process.exit(1);
   }
 }
 
-// Phase 1: Pre-merge validation
-async function validateMerge(worktreeName, _options, _cfg) {
-  const issues = [];
+// Silent backup creation
+async function createSilentBackup(backupManager, operation) {
+  await backupManager.init();
   
-  try {
-    // Check for uncommitted changes in main repo
-    const hasUncommitted = await gitOps.hasUncommittedChanges();
-    if (hasUncommitted) {
-      // Check if the uncommitted changes are just worktree files
-      const git = require('simple-git')(config.getBaseDir() ? path.dirname(config.getBaseDir()) : process.cwd());
-      const status = await git.status();
-      
-      const worktreeFiles = ['.worktree-config.json', '.worktrees/'];
-      const onlyWorktreeFiles = status.files.every(file => 
-        worktreeFiles.some(wf => file.path.includes(wf))
-      );
-      
-      if (onlyWorktreeFiles) {
-        issues.push({
-          type: 'uncommittedChanges',
-          severity: 'blocking',
-          message: 'Worktree configuration files are not in .gitignore',
-          detail: 'Run "wt init" to update .gitignore, then commit the changes'
-        });
-      } else {
-        issues.push({
-          type: 'uncommittedChanges',
-          severity: 'blocking',
-          message: 'Main repository has uncommitted changes'
-        });
-      }
-    }
-    
-    // Check git status - TODO: gitOps.status() doesn't exist yet
-    // const gitStatus = await gitOps.status();
-    // if (gitStatus && gitStatus.conflicted && gitStatus.conflicted.length > 0) {
-    //   issues.push({
-    //     type: 'conflictMarkers',
-    //     severity: 'blocking',
-    //     message: 'Repository has unresolved merge conflicts',
-    //     files: gitStatus.conflicted
-    //   });
-    // }
-    
-    // Check if worktree exists and get its path
-    const worktreePath = config.getWorktreePath(worktreeName);
-    const worktrees = await gitOps.listWorktrees();
-    
-    let worktree = worktrees.find(wt => PathUtils.equals(wt.path, worktreePath));
-    if (!worktree) {
-      worktree = worktrees.find(wt => {
-        const wtName = path.basename(wt.path);
-        return wtName === worktreeName;
-      });
-    }
-    if (!worktree) {
-      worktree = worktrees.find(wt => wt.branch === worktreeName);
-    }
-    
-    if (!worktree) {
-      issues.push({
-        type: 'worktreeNotFound',
-        severity: 'blocking',
-        message: `Worktree '${worktreeName}' not found`,
-        worktreeName: worktreeName
-      });
-      return { safe: false, issues };
-    }
-    
-    // Check for uncommitted changes in worktree
-    const hasWorktreeUncommitted = await gitOps.hasUncommittedChanges(worktree.path);
-    if (hasWorktreeUncommitted) {
-      issues.push({
-        type: 'uncommittedChanges',
-        severity: 'blocking',
-        message: `Worktree '${worktreeName}' has uncommitted changes`,
-        worktree: worktree.path
-      });
-    }
-    
-    return {
-      safe: issues.filter(i => i.severity === 'blocking').length === 0,
-      issues,
-      worktree
-    };
-    
-  } catch (error) {
-    return {
-      safe: false,
-      issues: [{
-        type: 'validationError',
-        severity: 'blocking',
-        message: `Validation failed: ${error.message}`
-      }]
-    };
-  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupId = `${operation}-${timestamp}`;
+  const operationBackupDir = path.join(backupManager.backupDir, backupId);
+  
+  await require('fs-extra').ensureDir(operationBackupDir);
+  
+  // Save current state silently
+  const currentBranch = await backupManager.getCurrentBranch();
+  const currentCommit = await backupManager.getCurrentCommit();
+  
+  const backup = {
+    id: backupId,
+    operation,
+    timestamp: new Date().toISOString(),
+    branch: currentBranch,
+    commit: currentCommit,
+    workingDirectory: backupManager.baseDir
+  };
+  
+  await require('fs-extra').writeJson(
+    path.join(operationBackupDir, 'backup.json'),
+    backup,
+    { spaces: 2 }
+  );
+  
+  return backupId;
 }
 
-function handlePreMergeIssues(issues, _messageFormatter) {
-  const errorLevel = process.env.WTT_ERROR_LEVEL || 'enhanced';
+// Get conflict count from error
+async function getConflictCount(error) {
+  // Try to extract conflict count from error message
+  const match = error.message.match(/(\d+) conflict/);
+  if (match) {
+    return match[1];
+  }
   
-  if (errorLevel === 'simple') {
-    // Simple error messages for automation/testing
-    for (const issue of issues) {
-      if (issue.severity === 'blocking') {
-        switch (issue.type) {
-        case 'uncommittedChanges':
-          console.log('✗ Worktree has uncommitted changes');
-          console.log('Please commit or stash changes before merging');
-          break;
-        case 'worktreeNotFound':
-          console.error('Error:', `Worktree '${issue.worktreeName}' doesn't exist. Use 'wt list' to see available worktrees`);
-          break;
-        }
-      }
-    }
-  } else {
-    // Enhanced error messages for regular use
-    console.log(chalk.red.bold('\n❌ Pre-merge validation failed\n'));
-    
-    for (const issue of issues) {
-      if (issue.severity === 'blocking') {
-        // Display the issue message directly with formatting
-        console.log(chalk.yellow(issue.message));
-        if (issue.detail) {
-          console.log(chalk.gray(`  ${issue.detail}`));
-        }
-        if (issue.worktree) {
-          console.log(chalk.gray(`  Worktree: ${issue.worktree}`));
-        }
-        console.log();
-      }
-    }
-    
-    console.log(chalk.blue.bold('\n🔧 Resolution Options:\n'));
-    console.log('1) Commit your changes');
-    console.log(chalk.gray('   Git: git add . && git commit -m "Your message"'));
-    console.log();
-    console.log('2) Stash your changes');
-    console.log(chalk.gray('   Git: git stash'));
-    console.log();
-    
-    console.log(chalk.yellow('\nPlease resolve the above issues before attempting to merge.'));
+  // Default to generic count
+  return 'multiple';
+}
+
+// Handle pre-merge issues with concise output
+function handlePreMergeIssues(issues, messageFormatter, output) {
+  if (!issues || issues.length === 0) {
+    return;
+  }
+  
+  const issue = issues[0]; // Show first issue only
+  
+  switch (issue.type) {
+    case 'uncommitted_changes':
+      output.error('merge', 'uncommitted changes in worktree');
+      break;
+    case 'detached_head':
+      output.error('merge', 'worktree is in detached HEAD state');
+      break;
+    case 'branch_missing':
+      output.error('merge', `branch '${issue.branch}' not found`);
+      break;
+    case 'worktree_missing':
+      output.error('merge', `worktree '${issue.worktree}' not found`);
+      break;
+    default:
+      output.error('merge', issue.message || 'pre-merge validation failed');
   }
   
   process.exit(1);
+}
+
+// Validation function (unchanged but returns structured data)
+async function validateMerge(worktreeName, options, configObj) {
+  const issues = [];
+  
+  try {
+    // Check if worktree exists - use the global config instance, not the passed object
+    const worktreePath = config.getWorktreePath(worktreeName);
+    
+    const exists = await require('fs-extra').pathExists(worktreePath);
+    if (!exists) {
+      // Debug: show what path we're checking
+      if (process.env.WTT_DEBUG === 'true') {
+        console.error(`[DEBUG] validateMerge: worktree path '${worktreePath}' does not exist`);
+        console.error(`[DEBUG] validateMerge: config.getWorktreePath available: ${!!config.getWorktreePath}`);
+        console.error(`[DEBUG] validateMerge: process.cwd(): ${process.cwd()}`);
+      }
+      issues.push({ type: 'worktree_missing', worktree: worktreeName });
+      return { safe: false, issues };
+    }
+    
+    // Check for uncommitted changes
+    const hasUncommitted = await gitOps.hasUncommittedChanges(worktreePath);
+    if (hasUncommitted && !options.force) {
+      issues.push({ type: 'uncommitted_changes', path: worktreePath });
+    }
+    
+    // More validation can be added here
+    
+  } catch (error) {
+    issues.push({ type: 'error', message: error.message });
+  }
+  
+  return {
+    safe: issues.length === 0,
+    issues
+  };
 }
 
 module.exports = { mergeCommand };

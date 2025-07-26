@@ -7,8 +7,11 @@ const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const PathUtils = require('../lib/pathUtils');
 const { addCommandContext } = require('../lib/errorTranslator');
+const Output = require('../lib/output');
 
 async function createCommand(branchName, options) {
+  const output = new Output({ verbose: options.verbose });
+  
   try {
     await gitOps.validateRepository();
     await config.load();
@@ -35,15 +38,18 @@ async function createCommand(branchName, options) {
     }
     
     await gitOps.createWorktree(worktreePath, branchName, baseBranch, mainBranch);
-    console.log(`✓ Worktree created at ${worktreePath}`);
     
-    // Only show "created from" message when we're actually creating a new branch
+    // Concise output - combine creation messages
     if (!targetBranchExists && baseBranch) {
-      if (!options.from) {
-        console.log(`✓ Created new branch '${branchName}' from '${mainBranch}' (default)`);
-      } else {
-        console.log(`✓ Created new branch '${branchName}' from '${baseBranch}'`);
-      }
+      const fromBranch = options.from ? baseBranch : `${mainBranch} (default)`;
+      output.success('create', `created '${branchName}' from '${fromBranch}' at ${worktreePath}`);
+    } else {
+      output.success('create', `created worktree at ${worktreePath}`);
+    }
+    
+    output.verboseStep('create', `worktree created at ${worktreePath}`);
+    if (!targetBranchExists && baseBranch) {
+      output.verboseStep('create', `created new branch '${branchName}' from '${baseBranch}'`);
     }
     
     await portManager.init(config.getBaseDir());
@@ -51,10 +57,8 @@ async function createCommand(branchName, options) {
     const services = Object.keys(cfg.portRanges);
     const ports = await portManager.assignPorts(worktreeName, services, cfg.portRanges);
     
-    console.log('✓ Assigned ports:');
-    for (const [service, port] of Object.entries(ports)) {
-      console.log(`  - ${service}: ${port}`);
-    }
+    // Show port assignments in verbose mode only
+    output.verboseStep('create', `assigned ports: ${Object.entries(ports).map(([s, p]) => `${s}:${p}`).join(', ')}`);
     
     const envContent = Object.entries(ports)
       .map(([service, port]) => `${service.toUpperCase()}_PORT=${port}`)
@@ -63,7 +67,7 @@ async function createCommand(branchName, options) {
     
     const envPath = path.join(worktreePath, '.env.worktree');
     await fs.writeFile(envPath, envContent);
-    console.log('✓ Created .env.worktree');
+    output.verboseStep('create', 'created .env.worktree');
     
     // Ensure .env.worktree is ignored by git to prevent merge conflicts
     const gitignorePath = path.join(worktreePath, '.gitignore');
@@ -79,34 +83,36 @@ async function createCommand(branchName, options) {
         gitignoreContent += (gitignoreContent.endsWith('\n') || gitignoreContent.endsWith('\r\n')) ? '' : os.EOL;
         gitignoreContent += '.env.worktree' + os.EOL;
         await fs.writeFile(gitignorePath, gitignoreContent);
-        console.log('✓ Added .env.worktree to .gitignore');
+        output.verboseStep('create', 'added .env.worktree to .gitignore');
       }
     } catch (error) {
-      console.log(chalk.yellow('⚠ Could not automatically add .env.worktree to .gitignore'));
+      output.verboseStep('create', 'warning: could not automatically add .env.worktree to .gitignore');
     }
     
-    
-    console.log('\n' + 'To start working:');
-    console.log(chalk.gray(`  cd ${worktreePath}`));
-    
-    const packageJsonPath = path.join(worktreePath, 'package.json');
-    try {
-      await fs.access(packageJsonPath);
-      const services = Object.keys(ports);
-      if (services.includes('vite')) {
-        console.log(chalk.gray(`  npm run dev        # Runs on port ${ports.vite}`));
+    // Show next steps only in verbose mode
+    if (options.verbose) {
+      output.raw('\n' + 'To start working:');
+      output.raw(chalk.gray(`  cd ${worktreePath}`));
+      
+      const packageJsonPath = path.join(worktreePath, 'package.json');
+      try {
+        await fs.access(packageJsonPath);
+        const services = Object.keys(ports);
+        if (services.includes('vite')) {
+          output.raw(chalk.gray(`  npm run dev        # Runs on port ${ports.vite}`));
+        }
+        if (services.includes('storybook')) {
+          output.raw(chalk.gray(`  npm run storybook  # Runs on port ${ports.storybook}`));
+        }
+      } catch {
+        // package.json doesn't exist, skip usage instructions
       }
-      if (services.includes('storybook')) {
-        console.log(chalk.gray(`  npm run storybook  # Runs on port ${ports.storybook}`));
-      }
-    } catch {
-      // package.json doesn't exist, skip usage instructions
     }
     
   } catch (error) {
-    console.error(chalk.red('Error:'), error.message);
+    output.error('create', error.message);
     const context = addCommandContext(error.message, 'create');
-    if (context.tips && context.tips.length > 0) {
+    if (context.tips && context.tips.length > 0 && options.verbose) {
       console.error(chalk.yellow('\nTips:'));
       context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
     }

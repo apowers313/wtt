@@ -19,10 +19,8 @@ describe('wt ports command', () => {
     const result = await repo.run('ports feature-test');
     
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('feature-test');
-    expect(result.stdout).toContain('vite: 3000');
-    expect(result.stdout).toContain('storybook: 6006');
-    expect(result.stdout).toContain('custom: 8000');
+    // New concise output format
+    expect(result.stdout).toContain('wt ports: feature-test: vite:3000, storybook:6006, custom:8000');
   });
 
   test('shows all port assignments when no worktree specified', async () => {
@@ -32,10 +30,8 @@ describe('wt ports command', () => {
     const result = await repo.run('ports');
     
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('feature-1');
-    expect(result.stdout).toContain('vite: 3000');
-    expect(result.stdout).toContain('feature-2');
-    expect(result.stdout).toContain('vite: 3010');
+    // New concise output format shows summary
+    expect(result.stdout).toContain('wt ports: 2 worktrees using 6 ports');
   });
 
 
@@ -43,13 +39,13 @@ describe('wt ports command', () => {
     const result = await repo.run('ports');
     
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('No port assignments found');
+    expect(result.stdout).toContain('wt ports: no port assignments found');
   });
 
   test('shows message when worktree has no ports', async () => {
     const result = await repo.run('ports nonexistent');
     
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('No ports assigned to worktree');
+    expect(result.stdout).toContain('wt ports: no ports assigned to worktree');
   });
 });

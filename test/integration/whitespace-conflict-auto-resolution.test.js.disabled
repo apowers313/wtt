@@ -1,0 +1,154 @@
+const { exec } = require('child_process');
+const fs = require('fs').promises;
+const path = require('path');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
+
+describe('Whitespace Conflict Auto-Resolution Integration', () => {
+  const testDir = path.join(__dirname, '../../test-tmp/whitespace-conflicts');
+  const wtCmd = path.join(__dirname, '../../wt.js');
+
+  beforeEach(async () => {
+    // Create test directory
+    await fs.mkdir(testDir, { recursive: true });
+    process.chdir(testDir);
+
+    // Initialize git repo
+    await execAsync('git init');
+    await execAsync('git config user.email "test@example.com"');
+    await execAsync('git config user.name "Test User"');
+    
+    // Get the default branch name
+    const { stdout: defaultBranch } = await execAsync('git branch --show-current');
+    const mainBranch = defaultBranch.trim() || 'master';
+    
+    // Create initial file with specific formatting
+    await fs.writeFile('test.js', 'function hello() {\n  console.log("Hello");\n}\n');
+    await execAsync('git add test.js');
+    await execAsync('git commit -m "Initial commit"');
+
+    // Create branch with different whitespace
+    await execAsync('git checkout -b feature');
+    await fs.writeFile('test.js', 'function hello() {  \n\tconsole.log("Hello");\n}\n');
+    await execAsync('git add test.js');
+    await execAsync('git commit -m "Change formatting"');
+
+    // Go back to main and make conflicting change
+    await execAsync(`git checkout ${mainBranch}`);
+    await fs.writeFile('test.js', 'function hello() {\n    console.log("Hello");\n}\n');
+    await execAsync('git add test.js');
+    await execAsync('git commit -m "Different formatting"');
+    
+    // Initialize worktree tool
+    await execAsync(`node ${wtCmd} init`);
+  });
+
+  afterEach(async () => {
+    process.chdir(__dirname);
+    await fs.rm(testDir, { recursive: true, force: true });
+  });
+
+  it('should auto-resolve whitespace conflicts with --auto-whitespace', async () => {
+    // Try to merge - this should create conflicts
+    try {
+      await execAsync('git merge feature');
+    } catch (error) {
+      // Expected to fail due to conflicts
+    }
+
+    // Check that we have conflicts
+    const { stdout: statusBefore } = await execAsync('git status --porcelain');
+    expect(statusBefore).toContain('UU test.js');
+
+    // Run conflicts fix with auto-whitespace
+    let stdout, stderr;
+    try {
+      const result = await execAsync(`node ${wtCmd} conflicts fix --auto-whitespace`);
+      stdout = result.stdout;
+      stderr = result.stderr;
+    } catch (error) {
+      console.error('Command failed with error:', error.message);
+      console.error('Stdout:', error.stdout);
+      console.error('Stderr:', error.stderr);
+      throw error;
+    }
+    
+    expect(stdout).toContain('Auto-resolved 1 whitespace-only conflicts');
+    expect(stdout).toContain('Auto-resolved whitespace conflicts in test.js');
+    expect(stdout).toContain('No conflicts to resolve!');
+
+    // Verify file is staged
+    const { stdout: statusAfter } = await execAsync('git status --porcelain');
+    expect(statusAfter).toContain('M  test.js');
+    expect(statusAfter).not.toContain('UU');
+  });
+
+  it('should respect whitespace-mode option', async () => {
+    // Get the default branch name
+    const { stdout: defaultBranch } = await execAsync('git branch --show-current');
+    const mainBranch = defaultBranch.trim() || 'master';
+    
+    // Create a pure whitespace conflict
+    await execAsync(`git checkout ${mainBranch}`);
+    await fs.writeFile('indent.js', '  function test() {\n    return true;\n  }\n');
+    await execAsync('git add indent.js');
+    await execAsync('git commit -m "Add with spaces"');
+
+    await execAsync('git checkout feature');
+    await fs.writeFile('indent.js', '\tfunction test() {\n\t\treturn true;\n\t}\n');
+    await execAsync('git add indent.js');
+    await execAsync('git commit -m "Add with tabs"');
+
+    await execAsync(`git checkout ${mainBranch}`);
+    try {
+      await execAsync('git merge feature');
+    } catch (error) {
+      // Expected to fail
+    }
+
+    // Test with --whitespace-mode=ours
+    const { stdout } = await execAsync(`node ${wtCmd} conflicts fix --auto-whitespace --whitespace-mode=ours`);
+    expect(stdout).toContain('Auto-resolved whitespace conflicts');
+
+    // Check that we kept spaces (ours)
+    const content = await fs.readFile('indent.js', 'utf8');
+    expect(content).toContain('  function test()');
+    expect(content).not.toContain('\tfunction test()');
+  });
+
+  it('should handle mixed conflicts correctly', async () => {
+    // Get the default branch name
+    const { stdout: defaultBranch } = await execAsync('git branch --show-current');
+    const mainBranch = defaultBranch.trim() || 'master';
+    
+    // Create both whitespace and real conflicts
+    await execAsync(`git checkout ${mainBranch}`);
+    await fs.writeFile('mixed.js', 'const x = 5;  \nconst y = 10;\n');
+    await execAsync('git add mixed.js');
+    await execAsync('git commit -m "Add mixed"');
+
+    await execAsync('git checkout feature');
+    await fs.writeFile('mixed.js', 'const x = 15;\nconst y = 10;\n');
+    await execAsync('git add mixed.js');
+    await execAsync('git commit -m "Change value"');
+
+    await execAsync(`git checkout ${mainBranch}`);
+    try {
+      await execAsync('git merge feature');
+    } catch (error) {
+      // Expected
+    }
+
+    // Run auto-whitespace resolution
+    const { stdout } = await execAsync(`node ${wtCmd} conflicts fix --auto-whitespace`, { 
+      input: '1\n' // Select "use ours" for the remaining conflict
+    });
+
+    // Should not auto-resolve this as it's not pure whitespace
+    expect(stdout).not.toContain('Auto-resolved 1 whitespace-only conflicts');
+    
+    // But should offer whitespace cleanup options
+    const { stdout: listOutput } = await execAsync(`node ${wtCmd} conflicts list`);
+    expect(listOutput).toContain('1 file(s) with conflicts');
+  });
+});

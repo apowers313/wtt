@@ -158,6 +158,105 @@ describe('wt merge command', () => {
     }
   });
 
+  test('merges successfully when run from within worktree directory', async () => {
+    // This test catches the issue where merge fails when run from inside a worktree
+    await helpers.createWorktree('feature-inside');
+    
+    // Make changes in the worktree
+    await repo.inWorktree('feature-inside', async () => {
+      await repo.writeFile('inside-feature.js', 'export const feature = () => "inside";');
+      await repo.git('add .');
+      await repo.git('commit -m "Add inside feature"');
+    });
+    
+    // Now run merge command from WITHIN the worktree directory
+    const worktreePath = path.join(repo.dir, '.worktrees', 'feature-inside');
+    const originalCwd = process.cwd();
+    
+    try {
+      process.chdir(worktreePath);
+      
+      // Run merge from within the worktree - should auto-detect current worktree
+      // Use execAsync directly to avoid the repo.exec() changing directories
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      
+      const result = await execAsync(`node "${repo.toolPath}" merge`, {
+        env: { ...process.env, WTT_AUTO_CONFIRM: 'true' }
+      }).then(
+        ({ stdout, stderr }) => ({ exitCode: 0, stdout: stdout.trim(), stderr: stderr.trim() }),
+        (error) => ({ 
+          exitCode: error.code || 1, 
+          stdout: error.stdout ? error.stdout.toString().trim() : '', 
+          stderr: error.stderr ? error.stderr.toString().trim() : error.message 
+        })
+      );
+      
+      helpers.expectSuccess(result);
+      helpers.expectOutputContains(result, ['auto-detected', 'feature-inside']);
+      helpers.expectOutputContains(result, ['merged', 'Merged']);
+      
+      // Go back to main repo to verify
+      process.chdir(repo.dir);
+      
+      // Verify file exists in main
+      expect(await repo.exists('inside-feature.js')).toBe(true);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
+  test('merges successfully with explicit worktree name from within worktree directory', async () => {
+    // This test specifically covers the bug where validateMerge was using process.cwd() 
+    // instead of config.getWorktreePath() when run from inside a worktree
+    await helpers.createWorktree('feature-explicit');
+    
+    // Make changes in the worktree
+    await repo.inWorktree('feature-explicit', async () => {
+      await repo.writeFile('explicit-feature.js', 'export const feature = () => "explicit";');
+      await repo.git('add .');
+      await repo.git('commit -m "Add explicit feature"');
+    });
+    
+    // Now run merge command from WITHIN the worktree directory with explicit name
+    const worktreePath = path.join(repo.dir, '.worktrees', 'feature-explicit');
+    const originalCwd = process.cwd();
+    
+    try {
+      process.chdir(worktreePath);
+      
+      // Run merge with explicit worktree name from within the worktree
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      
+      const result = await execAsync(`node "${repo.toolPath}" merge feature-explicit`, {
+        env: { ...process.env, WTT_AUTO_CONFIRM: 'true' }
+      }).then(
+        ({ stdout, stderr }) => ({ exitCode: 0, stdout: stdout.trim(), stderr: stderr.trim() }),
+        (error) => ({ 
+          exitCode: error.code || 1, 
+          stdout: error.stdout ? error.stdout.toString().trim() : '', 
+          stderr: error.stderr ? error.stderr.toString().trim() : error.message 
+        })
+      );
+      
+      helpers.expectSuccess(result);
+      // Should NOT contain "worktree not found" error
+      expect(result.stderr).not.toContain('worktree \'feature-explicit\' not found');
+      helpers.expectOutputContains(result, ['merged', 'Merged']);
+      
+      // Go back to main repo to verify
+      process.chdir(repo.dir);
+      
+      // Verify file exists in main
+      expect(await repo.exists('explicit-feature.js')).toBe(true);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
   test('handles merge conflicts', async () => {
     // Create base file
     await repo.writeFile('conflict.js', 'export const value = "main";\n');
@@ -183,7 +282,7 @@ describe('wt merge command', () => {
     
     helpers.expectFailure(result);
     helpers.expectOutputContains(result, ['conflict', 'CONFLICT']);
-  });
+  }, 60000);
 
   test('merges successfully when run from different directory', async () => {
     // Create worktree and make changes

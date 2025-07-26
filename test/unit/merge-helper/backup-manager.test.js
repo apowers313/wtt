@@ -200,10 +200,12 @@ describe('BackupManager', () => {
 
     it('should skip invalid backup directories', async () => {
       fs.readdir.mockResolvedValue(['valid-backup', 'invalid-dir']);
-      fs.pathExists.mockImplementation((path) => 
-        Promise.resolve(path.includes('valid-backup'))
-      );
-      fs.readJSON.mockResolvedValue({ id: 'valid-backup', timestamp: '2024-01-20T10:30:00.000Z' });
+      fs.pathExists.mockImplementation((path) => {
+        // Return true for the backup dir itself and valid backup info file
+        if (path.endsWith('.backups')) return Promise.resolve(true);
+        return Promise.resolve(path.includes('valid-backup') && path.endsWith('backup-info.json'));
+      });
+      fs.readJSON.mockResolvedValue({ timestamp: '2024-01-20T10:30:00.000Z' });
       
       const backups = await backupManager.listBackups();
       
@@ -212,11 +214,10 @@ describe('BackupManager', () => {
     });
 
     it('should handle readdir errors', async () => {
+      fs.pathExists.mockResolvedValue(true);
       fs.readdir.mockRejectedValue(new Error('Directory read error'));
       
-      const backups = await backupManager.listBackups();
-      
-      expect(backups).toEqual([]);
+      await expect(backupManager.listBackups()).rejects.toThrow('Directory read error');
     });
   });
 

@@ -231,11 +231,9 @@ Add to `.worktree-config.json`:
 
 ### 10. Future Enhancements
 
-1. **Pane Layouts**: Pre-configured layouts for development
-2. **Service Integration**: Auto-start services in panes
+1. **Service Integration**: Auto-start services in worktree
+2. **Start Command**: Run a user-specified command in a worktree
 3. **Session Templates**: Customizable window/pane setups
-4. **Persistence**: Save/restore session state
-5. **Multi-Monitor**: Optimize for multiple displays
 
 ## Summary
 

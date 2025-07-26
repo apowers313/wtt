@@ -90,7 +90,7 @@ describe('Switch Command Shell Prompts', () => {
         cwd: repoDir
       }).toString();
       
-      expect(output).to.include('Switching to worktree');
+      expect(output).to.include('switching to');
       // The actual prompt testing would require manual testing
     });
 
@@ -124,7 +124,7 @@ describe('Switch Command Shell Prompts', () => {
         cwd: repoDir
       }).toString();
 
-      expect(output).to.include('Switching to worktree');
+      expect(output).to.include('switching to');
       expect(output).to.include('test-feature');
       expect(output).to.include('cd ');
       expect(output).to.include('.worktrees/test-feature');
@@ -166,7 +166,7 @@ describe('Switch Command Shell Prompts', () => {
         env: { ...process.env, SHELL: '/bin/bash' }
       }).toString();
 
-      expect(output).to.include('Switching to worktree');
+      expect(output).to.include('switching to');
     });
 
     it('should detect zsh shell', () => {
@@ -175,7 +175,7 @@ describe('Switch Command Shell Prompts', () => {
         env: { ...process.env, SHELL: '/usr/bin/zsh' }
       }).toString();
 
-      expect(output).to.include('Switching to worktree');
+      expect(output).to.include('switching to');
     });
 
     it('should handle Windows PowerShell', () => {
@@ -184,7 +184,7 @@ describe('Switch Command Shell Prompts', () => {
         env: { ...process.env, SHELL: undefined, COMSPEC: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' }
       }).toString();
 
-      expect(output).to.include('Switching to worktree');
+      expect(output).to.include('switching to');
     });
   });
 

@@ -4,6 +4,8 @@ const fs = require('fs-extra');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
+const gitTemplateCache = require('./git-template-cache');
+const GitWrapper = require('./git-wrapper');
 
 class TestRepository {
   constructor() {
@@ -11,26 +13,50 @@ class TestRepository {
     this.name = `test-repo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
   
-  async init() {
+  async init(useTemplate = true) {
     // Create temp directory
     this.dir = path.join(os.tmpdir(), 'wtt-tests', this.name);
     await fs.ensureDir(this.dir);
     // Resolve symlinks to get the real path (important for macOS)
     this.dir = await fs.realpath(this.dir);
     
-    // Initialize git repo
-    await this.git('init');
-    await this.git('config user.email "test@example.com"');
-    await this.git('config user.name "Test User"');
-    await this.git('config commit.gpgsign false');
-    
-    // Create initial commit
-    await this.writeFile('README.md', '# Test Repository');
-    await this.git('add .');
-    await this.git('commit -m "Initial commit"');
-    
-    // Rename master to main for consistency
-    await this.git('branch -m master main');
+    if (useTemplate) {
+      // Use cached template - MUCH faster!
+      await gitTemplateCache.copyToDirectory(this.dir);
+    } else {
+      // Fallback to old method if needed
+      // Copy test git config to ensure consistent behavior
+      const testGitConfig = path.join(__dirname, '../fixtures/test-gitconfig');
+      const localGitConfig = path.join(this.dir, '.gitconfig');
+      if (await fs.pathExists(testGitConfig)) {
+        await fs.copy(testGitConfig, localGitConfig);
+      }
+      
+      // Initialize git repo with isolated config
+      await this.git('init');
+      
+      // Use local git config file for all settings
+      await this.git(`config --local include.path ${localGitConfig}`);
+      
+      // Override any potentially problematic global settings
+      await this.git('config --local user.email "test@example.com"');
+      await this.git('config --local user.name "Test User"');
+      await this.git('config --local commit.gpgsign false');
+      await this.git('config --local tag.gpgsign false');
+      await this.git('config --local core.autocrlf false');
+      
+      // Create initial commit
+      await this.writeFile('README.md', '# Test Repository');
+      await this.git('add .');
+      await this.git('commit --no-gpg-sign -m "Initial commit"');
+      
+      // Rename master to main for consistency
+      try {
+        await this.git('branch -m master main');
+      } catch (e) {
+        // Branch might already be main
+      }
+    }
     
     // Copy wt tool
     await this.installTool();
@@ -51,28 +77,70 @@ class TestRepository {
     
     // Save current directory and change to test repo
     const originalCwd = process.cwd();
+    
+    // Check if directory exists before changing to it
+    if (!await this.exists('')) {
+      throw new Error(`Test repository directory does not exist: ${this.dir}`);
+    }
+    
     process.chdir(this.dir);
     
     try {
       return await this.exec(fullCommand);
     } finally {
       // Always restore original directory
-      process.chdir(originalCwd);
+      try {
+        process.chdir(originalCwd);
+      } catch (error) {
+        // Original directory might not exist anymore, try to change to a safe directory
+        process.chdir(require('os').homedir());
+      }
     }
   }
   
   async git(command) {
-    
-    return await this.exec(`git ${command}`);
+    // Wrap command to ensure no signing
+    const wrappedCommand = GitWrapper.wrapCommand(`git ${command}`);
+    // Use isolated git environment
+    return await this.exec(wrappedCommand);
   }
   
   async exec(command) {
     // const startTime = Date.now();
     
     try {
+      // Create isolated environment for git operations
+      // Start with clean environment, only copy essentials
+      const baseEnv = {
+        PATH: process.env.PATH,
+        NODE: process.env.NODE,
+        npm_lifecycle_event: process.env.npm_lifecycle_event,
+        npm_node_execpath: process.env.npm_node_execpath,
+        // Git will be forced to use only our config
+        // Override git config locations to prevent global config interference
+        GIT_CONFIG_NOSYSTEM: '1',  // Ignore system git config
+        GIT_CONFIG_GLOBAL: '/dev/null', // Point global config to nowhere
+        GIT_CONFIG: path.join(this.dir, '.git', 'config'), // Force specific config file
+        HOME: this.dir,            // Use test dir as HOME to avoid ~/.gitconfig
+        USERPROFILE: this.dir,     // Windows equivalent of HOME
+        XDG_CONFIG_HOME: this.dir, // Also override XDG config location
+        // Disable any git hooks that might be globally configured
+        GIT_HOOKS_PATH: '/dev/null',
+        // Ensure consistent behavior
+        GIT_TERMINAL_PROMPT: '0',  // Disable password prompts
+        GIT_ASKPASS: '/bin/echo', // Provide empty password if asked
+        SSH_ASKPASS: '/bin/echo', // Same for SSH
+        // Disable GPG entirely
+        GPG_TTY: '',
+        GNUPGHOME: '/dev/null',    // Invalid GPG home directory
+      };
+      
+      // Apply additional no-sign environment variables
+      const testEnv = GitWrapper.getNoSignEnvironment(baseEnv);
+      
       const { stdout, stderr } = await execAsync(command, { 
         cwd: this.dir,
-        env: { ...process.env }  // Ensure environment variables are passed
+        env: testEnv
       });
       
       const result = { 

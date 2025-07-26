@@ -8,8 +8,11 @@ const gitOps = require('../lib/gitOps');
 const PathUtils = require('../lib/pathUtils');
 const { addCommandContext } = require('../lib/errorTranslator');
 const { getCurrentWorktree } = require('../lib/currentWorktree');
+const Output = require('../lib/output');
 
 async function removeCommand(worktreeName, options) {
+  const output = new Output({ verbose: options.verbose });
+  
   try {
     await gitOps.validateRepository();
     await config.load();
@@ -20,7 +23,7 @@ async function removeCommand(worktreeName, options) {
       if (!worktreeName) {
         throw new Error('No worktree specified and not currently inside a worktree. Use \'wt list\' to see available worktrees.');
       }
-      console.log(chalk.gray(`Auto-detected current worktree: ${worktreeName}`));
+      output.verboseStep('remove', `auto-detected current worktree: ${worktreeName}`);
     }
     
     await portManager.init(config.getBaseDir());
@@ -124,37 +127,38 @@ async function removeCommand(worktreeName, options) {
       const directoryExists = await fs.access(worktreePath).then(() => true).catch(() => false);
       
       await gitOps.removeWorktree(worktreePath, options.force);
-      console.log(chalk.green('✓ Removed worktree'));
       
       if (!directoryExists) {
-        console.log(chalk.green('✓ Cleaned up broken worktree registration'));
+        output.success('remove', `cleaned up broken worktree '${worktreeName}'`);
+      } else {
+        output.success('remove', `removed worktree '${worktreeName}'`);
       }
     } else {
       // Clean up any remaining directory if it exists
       try {
         await fs.rm(worktreePath, { recursive: true });
-        console.log(chalk.green('✓ Removed worktree directory'));
+        output.success('remove', `removed worktree '${worktreeName}'`);
       } catch (error) {
         // Directory might not exist, that's fine
-        console.log(chalk.green('✓ Cleaned up worktree tracking'));
+        output.success('remove', `cleaned up tracking for '${worktreeName}'`);
       }
     }
     
     const assignedPorts = portManager.getPorts(worktreeName);
     if (assignedPorts) {
       await portManager.releasePorts(worktreeName);
-      console.log(`✓ Released ports ${portManager.formatPortDisplay(assignedPorts)}`);
+      output.verboseStep('remove', `released ports ${portManager.formatPortDisplay(assignedPorts)}`);
     }
     
-    if (worktree && worktree.branch) {
-      console.log(`\nNote: Branch '${worktree.branch}' still exists.`);
-      console.log(`To delete it, run: git branch -d ${worktree.branch}`);
+    if (worktree && worktree.branch && options.verbose) {
+      output.raw(`\nNote: Branch '${worktree.branch}' still exists.`);
+      output.raw(`To delete it, run: git branch -d ${worktree.branch}`);
     }
     
   } catch (error) {
-    console.error(chalk.red('Error:'), error.message);
+    output.error('remove', error.message);
     const context = addCommandContext(error.message, 'remove');
-    if (context.tips && context.tips.length > 0) {
+    if (context.tips && context.tips.length > 0 && options.verbose) {
       console.error(chalk.yellow('\nTips:'));
       context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
     }

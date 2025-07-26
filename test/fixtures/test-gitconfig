@@ -1,0 +1,60 @@
+# Test-specific git configuration
+# This ensures consistent git behavior across different environments
+
+[user]
+    name = Test User
+    email = test@example.com
+
+[commit]
+    # Disable GPG signing for tests
+    gpgsign = false
+
+[tag]
+    # Disable tag signing
+    gpgsign = false
+
+[core]
+    # Use simple autocrlf handling
+    autocrlf = false
+    # Disable file mode changes (helps on Windows)
+    filemode = false
+    # Simple editor that won't block
+    editor = cat
+
+[init]
+    # Use consistent default branch name
+    defaultBranch = main
+
+[merge]
+    # No fast-forward to ensure merge commits in tests
+    ff = false
+
+[pull]
+    # Disable rebase by default
+    rebase = false
+
+[push]
+    # Simple push behavior
+    default = simple
+
+[advice]
+    # Disable git advice messages that might interfere with output parsing
+    detachedHead = false
+    pushNonFastForward = false
+    statusHints = false
+    commitBeforeMerge = false
+    resolveConflict = false
+    implicitIdentity = false
+    setUpstreamFailure = false
+
+[color]
+    # Disable colors for consistent output parsing
+    ui = false
+
+[pager]
+    # Disable pager for all commands
+    branch = false
+    diff = false
+    log = false
+    show = false
+    status = false

@@ -1,0 +1,170 @@
+const { 
+  TestFactory, 
+  TestAssertions, 
+  ConsoleCapture,
+  TestPathUtils 
+} = require('../helpers');
+
+describe('wt create command (refactored)', () => {
+  let repo, helpers;
+  
+  beforeEach(async () => {
+    ({ repo, helpers } = await TestFactory.createScenario('clean-repo'));
+  });
+  
+  afterEach(async () => {
+    await repo.cleanup();
+  });
+
+  test('creates a new worktree', async () => {
+    const result = await helpers.createWorktree('feature-test');
+    
+    // Use new assertion helpers
+    TestAssertions.success(result);
+    TestAssertions.outputContains(result, 'Created');
+    
+    // Verify worktree exists
+    TestAssertions.worktreeExists(repo, 'feature-test');
+    
+    // Verify ports assigned
+    TestAssertions.portsAssigned(repo.portMap, 'feature-test', ['vite', 'storybook']);
+  });
+
+  test('creates worktree from specific branch', async () => {
+    // Setup branch with content
+    await repo.createBranch('develop');
+    await repo.checkout('develop');
+    await repo.writeFile('develop.txt', 'develop branch');
+    await repo.commit('Add develop file');
+    await repo.checkout('main');
+    
+    // Create worktree from develop branch
+    const result = await repo.run('create feature-from-develop --from develop');
+    
+    TestAssertions.success(result);
+    TestAssertions.worktreeExists(repo, 'feature-from-develop');
+    
+    // Verify file from develop branch exists
+    const worktreePath = TestPathUtils.join('.worktrees', 'wt-feature-from-develop', 'develop.txt');
+    TestAssertions.fileExists(repo, worktreePath);
+  });
+
+  test('fails if branch already exists', async () => {
+    // Create branch first
+    await repo.createBranch('existing-branch');
+    
+    const result = await helpers.createWorktree('existing-branch');
+    
+    // Should fail with clear error
+    TestAssertions.failure(result);
+    TestAssertions.outputContains(result, 'already exists');
+  });
+
+  test('assigns unique ports for multiple worktrees', async () => {
+    // Create multiple worktrees
+    const result1 = await helpers.createWorktree('feature-1');
+    const result2 = await helpers.createWorktree('feature-2');
+    
+    TestAssertions.success(result1);
+    TestAssertions.success(result2);
+    
+    // Get port assignments
+    const ports1 = helpers.getAssignedPorts('feature-1');
+    const ports2 = helpers.getAssignedPorts('feature-2');
+    
+    // Verify ports are unique
+    expect(ports1.vite).not.toBe(ports2.vite);
+    expect(ports1.storybook).not.toBe(ports2.storybook);
+    
+    // Ports should be sequential
+    expect(ports2.vite).toBe(ports1.vite + 1);
+    expect(ports2.storybook).toBe(ports1.storybook + 1);
+  });
+
+  test('handles concurrent worktree creation', async () => {
+    // Test creating multiple worktrees at once
+    const promises = [
+      helpers.createWorktree('concurrent-1'),
+      helpers.createWorktree('concurrent-2'),
+      helpers.createWorktree('concurrent-3')
+    ];
+    
+    const results = await Promise.all(promises);
+    
+    // All should succeed
+    results.forEach(result => TestAssertions.success(result));
+    
+    // All should have unique ports
+    const allPorts = new Set();
+    ['concurrent-1', 'concurrent-2', 'concurrent-3'].forEach(name => {
+      const ports = helpers.getAssignedPorts(name);
+      expect(allPorts.has(ports.vite)).toBe(false);
+      allPorts.add(ports.vite);
+    });
+  });
+
+  test('respects naming patterns', async () => {
+    const result = await helpers.createWorktree('my-feature');
+    
+    TestAssertions.success(result);
+    
+    // Verify worktree is created with correct prefix
+    const worktrees = repo.mockGit.state.worktrees;
+    const created = worktrees.find(wt => wt.branch === 'my-feature');
+    expect(created.path).toBe('.worktrees/wt-my-feature');
+  });
+});
+
+// Example: Using ConsoleCapture for command that logs to console
+describe('wt create with console output', () => {
+  test('captures console output correctly', async () => {
+    const { repo } = await TestFactory.createScenario('clean-repo');
+    
+    const { result, output } = await ConsoleCapture.captureAsync(async () => {
+      // Simulate command that logs to console
+      console.log('Creating worktree...');
+      const cmdResult = await repo.run('create test-console');
+      console.log('Worktree created successfully');
+      return cmdResult;
+    });
+    
+    TestAssertions.success(result);
+    expect(output.stdoutLines).toContain('Creating worktree...');
+    expect(output.stdoutLines).toContain('Worktree created successfully');
+    
+    await repo.cleanup();
+  });
+});
+
+// Example: Using TestFactory scenarios
+describe('wt create in different scenarios', () => {
+  test('creates worktree in repo with existing worktrees', async () => {
+    const { repo, helpers, worktreeNames } = await TestFactory.createScenario('multiple-worktrees');
+    
+    // Should already have 3 worktrees
+    TestAssertions.worktreeCount(repo, 3);
+    
+    // Create one more
+    const result = await helpers.createWorktree('additional-feature');
+    TestAssertions.success(result);
+    TestAssertions.worktreeCount(repo, 4);
+    
+    await repo.cleanup();
+  });
+
+  test('fails to create worktree with uncommitted changes', async () => {
+    const { repo, helpers } = await TestFactory.createScenario('dirty-worktree');
+    
+    // Verify repo is dirty
+    TestAssertions.isDirty(repo);
+    
+    // Attempt to create new worktree should fail or warn
+    const result = await helpers.createWorktree('new-feature');
+    
+    if (result.exitCode !== 0) {
+      TestAssertions.outputContains(result, 'uncommitted');
+    }
+    
+    await repo.cleanup();
+  });
+});

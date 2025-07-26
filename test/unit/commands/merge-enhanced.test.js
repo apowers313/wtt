@@ -5,6 +5,7 @@ const BackupManager = require('../../../lib/merge-helper/backup-manager');
 const ConflictDetector = require('../../../lib/merge-helper/conflict-detector');
 const portManager = require('../../../lib/portManager');
 const ProgressUI = require('../../../lib/ui/progress-ui');
+const rootFinder = require('../../../lib/rootFinder');
 const simpleGit = require('simple-git');
 const chalk = require('chalk');
 
@@ -15,6 +16,7 @@ jest.mock('../../../lib/merge-helper/conflict-detector');
 jest.mock('../../../lib/currentWorktree');
 jest.mock('../../../lib/portManager');
 jest.mock('../../../lib/ui/progress-ui');
+jest.mock('../../../lib/rootFinder');
 jest.mock('simple-git');
 
 describe('Enhanced Merge Command', () => {
@@ -72,13 +74,19 @@ describe('Enhanced Merge Command', () => {
       fail: jest.fn()
     });
     
-    // Mock simple-git
-    const mockGit = {
+    // Mock rootFinder
+    rootFinder.getMainRepoRoot = jest.fn().mockResolvedValue('/test/repo');
+    
+    // Mock simple-git (this will be the mainGit instance)
+    const mockMainGit = {
       status: jest.fn().mockResolvedValue({
+        current: 'feature-branch', // Start on feature branch so checkout gets called
         files: []
-      })
+      }),
+      checkout: jest.fn().mockResolvedValue(),
+      merge: jest.fn().mockResolvedValue()
     };
-    simpleGit.mockReturnValue(mockGit);
+    simpleGit.mockReturnValue(mockMainGit);
   });
 
   afterEach(() => {
@@ -133,7 +141,8 @@ describe('Enhanced Merge Command', () => {
     it('should pass validation when everything is clean', async () => {
       await mergeCommand('feature-branch', {});
       
-      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature-branch']);
+      const mockMainGit = simpleGit();
+      expect(mockMainGit.merge).toHaveBeenCalledWith(['feature-branch']);
       expect(mockProcessExit).not.toHaveBeenCalled();
     });
   });
@@ -202,7 +211,8 @@ describe('Enhanced Merge Command', () => {
   describe('Merge conflict handling', () => {
     it('should handle merge conflicts gracefully', async () => {
       const conflictError = new Error('CONFLICT: Merge conflict in src/app.js');
-      gitOps.git.merge.mockRejectedValue(conflictError);
+      const mockMainGit = simpleGit();
+      mockMainGit.merge.mockRejectedValue(conflictError);
       
       const mockBackupManager = {
         createSafetyBackup: jest.fn().mockResolvedValue({ id: 'merge-123' }),
@@ -252,7 +262,8 @@ describe('Enhanced Merge Command', () => {
       await mergeCommand('feature-branch', { check: true });
       
       expect(mockDetector.predictConflicts).toHaveBeenCalled();
-      expect(gitOps.git.merge).not.toHaveBeenCalled();
+      const mockMainGit = simpleGit();
+      expect(mockMainGit.merge).not.toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledWith(
         expect.stringContaining('No conflicts predicted')
       );

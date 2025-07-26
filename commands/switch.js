@@ -11,8 +11,11 @@ const gitOps = require('../lib/gitOps');
 const { addCommandContext } = require('../lib/errorTranslator');
 const PromptBuilder = require('../lib/promptBuilder');
 const { getCurrentWorktree } = require('../lib/currentWorktree');
+const Output = require('../lib/output');
 
 async function switchCommand(worktreeName, options = {}) {
+  const output = new Output({ verbose: options.verbose });
+  
   try {
     await gitOps.validateRepository();
     await config.load();
@@ -68,26 +71,26 @@ async function switchCommand(worktreeName, options = {}) {
       throw new Error(`Worktree '${worktreeName}' doesn't exist. Use 'wt list' to see available worktrees, or 'wt create ${worktreeName}' to create it`);
     }
     
-    console.log(chalk.blue(`Switching to worktree '${worktreeName}'...`));
-    console.log(chalk.gray(`Path: ${worktreePath}`));
+    output.status('switch', 'switching to', `'${worktreeName}'`);
+    output.verboseStep('switch', `path: ${worktreePath}`);
     
     const ports = portManager.getPorts(worktreeName);
-    if (ports) {
-      console.log('\n' + chalk.green('Assigned ports:'));
+    if (ports && options.verbose) {
+      output.raw('\n' + chalk.green('Assigned ports:'));
       for (const [service, port] of Object.entries(ports)) {
         const isRunning = await portManager.isPortInUse(port);
         const status = isRunning ? chalk.green(' (running)') : '';
-        console.log(chalk.gray(`  ${service}: ${port}${status}`));
+        output.raw(chalk.gray(`  ${service}: ${port}${status}`));
       }
     }
     
     const packageJsonPath = path.join(worktreePath, 'package.json');
     try {
       const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
-      if (packageJson.scripts) {
-        console.log('\n' + chalk.green('Available npm scripts:'));
+      if (packageJson.scripts && options.verbose) {
+        output.raw('\n' + chalk.green('Available npm scripts:'));
         for (const script of Object.keys(packageJson.scripts)) {
-          console.log(chalk.gray(`  npm run ${script}`));
+          output.raw(chalk.gray(`  npm run ${script}`));
         }
       }
     } catch {
@@ -96,26 +99,28 @@ async function switchCommand(worktreeName, options = {}) {
     
     if (options.shell === false) {
       // Old behavior: just show cd command
-      console.log('\n' + chalk.cyan('To navigate to this worktree:'));
-      console.log(chalk.gray(`  cd ${worktreePath}`));
+      output.raw('\n' + chalk.cyan('To navigate to this worktree:'));
+      output.raw(chalk.gray(`  cd ${worktreePath}`));
       
-      if (process.env.SHELL) {
-        console.log('\n' + chalk.yellow('Note: This command cannot change your current directory.'));
-        console.log(chalk.yellow('You need to manually run the cd command shown above.'));
+      if (process.env.SHELL && options.verbose) {
+        output.raw('\n' + chalk.yellow('Note: This command cannot change your current directory.'));
+        output.raw(chalk.yellow('You need to manually run the cd command shown above.'));
       }
     } else {
       // New behavior: spawn a shell
-      console.log('\n' + chalk.cyan('Spawning shell in worktree directory...'));
-      console.log(chalk.gray('Type "exit" to return to your original directory\n'));
+      output.verboseStep('switch', 'spawning shell in worktree directory');
+      if (options.verbose) {
+        output.raw(chalk.gray('Type "exit" to return to your original directory\n'));
+      }
       
       // Spawn a new shell in the worktree directory
-      await spawnShell(worktreePath, worktreeName, ports);
+      await spawnShell(worktreePath, worktreeName, ports, output);
     }
     
   } catch (error) {
-    console.error(chalk.red('Error:'), error.message);
+    output.error('switch', error.message);
     const context = addCommandContext(error.message, 'switch');
-    if (context.tips && context.tips.length > 0) {
+    if (context.tips && context.tips.length > 0 && options.verbose) {
       console.error(chalk.yellow('\nTips:'));
       context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
     }
@@ -123,7 +128,7 @@ async function switchCommand(worktreeName, options = {}) {
   }
 }
 
-async function spawnShell(worktreePath, worktreeName, ports = {}) {
+async function spawnShell(worktreePath, worktreeName, ports = {}, output) {
   return new Promise((resolve, reject) => {
     // Detect user's shell
     const userShell = process.env.SHELL || (os.platform() === 'win32' ? 'powershell.exe' : '/bin/sh');
@@ -215,8 +220,8 @@ end`];
     });
     
     shell.on('exit', (code) => {
-      if (code === 0) {
-        console.log(chalk.green('\nReturned to original directory'));
+      if (code === 0 && output) {
+        output.verboseStep('switch', 'returned to original directory');
         resolve();
       } else {
         resolve(); // Still resolve even on non-zero exit

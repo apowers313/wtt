@@ -4,8 +4,11 @@ const config = require('../lib/config');
 const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const { addCommandContext } = require('../lib/errorTranslator');
+const Output = require('../lib/output');
 
 async function listCommand(options) {
+  const output = new Output({ verbose: options.verbose });
+  
   try {
     await gitOps.validateRepository();
     await config.load();
@@ -21,13 +24,14 @@ async function listCommand(options) {
     });
     
     if (managedWorktrees.length === 0) {
-      console.log('No worktrees found.');
+      output.success('list', 'no worktrees found');
       return;
     }
     
     if (options.verbose) {
-      console.log('\nWORKTREE           BRANCH         PORTS              STATUS');
-      console.log('─'.repeat(70));
+      // Verbose mode - show detailed table
+      output.raw('\nWORKTREE           BRANCH         PORTS              STATUS');
+      output.raw('─'.repeat(70));
       
       for (const worktree of managedWorktrees) {
         const worktreeName = path.basename(worktree.path);
@@ -41,7 +45,7 @@ async function listCommand(options) {
           info = { branch: worktree.branch || 'unknown', error: true };
         }
         
-        console.log(worktreeName.padEnd(18) + ' ' + 
+        output.raw(worktreeName.padEnd(18) + ' ' + 
                    (info.branch || 'unknown').padEnd(14));
         
         if (ports) {
@@ -49,10 +53,10 @@ async function listCommand(options) {
             const isRunning = runningPorts[service];
             const portStr = `${service}:${port}`;
             const status = isRunning ? chalk.green('✓') : ' ';
-            console.log(' '.repeat(33) + portStr.padEnd(18) + status);
+            output.raw(' '.repeat(33) + portStr.padEnd(18) + status);
           }
         } else {
-          console.log(' '.repeat(33) + 'No ports assigned');
+          output.raw(' '.repeat(33) + 'No ports assigned');
         }
         
         if (!info.error) {
@@ -75,31 +79,25 @@ async function listCommand(options) {
           
           statusLines.forEach((line, i) => {
             if (i === 0) {
-              console.log(' '.repeat(52) + line);
+              output.raw(' '.repeat(52) + line);
             } else {
-              console.log(' '.repeat(52) + line);
+              output.raw(' '.repeat(52) + line);
             }
           });
         }
         
-        console.log();
+        output.raw('');
       }
     } else {
-      console.log('\nWorktrees:');
-      for (const worktree of managedWorktrees) {
-        const worktreeName = path.basename(worktree.path);
-        const ports = portManager.getPorts(worktreeName);
-        const portDisplay = ports ? portManager.formatPortDisplay(ports) : 'No ports';
-        
-        console.log(`  ${worktreeName} (${worktree.branch || 'unknown'}) - ${portDisplay}`);
-      }
-      console.log('\nUse --verbose for detailed information');
+      // Concise mode - single line summary
+      const worktreeList = managedWorktrees.map(wt => path.basename(wt.path)).join(', ');
+      output.success('list', `found ${managedWorktrees.length} worktrees: ${worktreeList}`);
     }
     
   } catch (error) {
-    console.error(chalk.red('Error:'), error.message);
+    output.error('list', error.message);
     const context = addCommandContext(error.message, 'list');
-    if (context.tips && context.tips.length > 0) {
+    if (context.tips && context.tips.length > 0 && options.verbose) {
       console.error(chalk.yellow('\nTips:'));
       context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
     }

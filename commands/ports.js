@@ -5,8 +5,11 @@ const portManager = require('../lib/portManager');
 const gitOps = require('../lib/gitOps');
 const { addCommandContext } = require('../lib/errorTranslator');
 const { getCurrentWorktree } = require('../lib/currentWorktree');
+const Output = require('../lib/output');
 
-async function portsCommand(worktreeName) {
+async function portsCommand(worktreeName, options = {}) {
+  const output = new Output({ verbose: options.verbose });
+  
   try {
     await gitOps.validateRepository();
     await config.load();
@@ -15,7 +18,7 @@ async function portsCommand(worktreeName) {
     if (!worktreeName) {
       worktreeName = await getCurrentWorktree();
       if (worktreeName) {
-        console.log(chalk.gray(`Auto-detected current worktree: ${worktreeName}`));
+        output.verboseStep('ports', `auto-detected current worktree: ${worktreeName}`);
       }
     }
     
@@ -26,11 +29,17 @@ async function portsCommand(worktreeName) {
       const ports = portManager.getPorts(worktreeName);
       
       if (!ports) {
-        console.log(`No ports assigned to worktree '${worktreeName}'`);
+        output.success('ports', `no ports assigned to worktree '${worktreeName}'`);
         return;
       }
       
-      console.log(`\nPorts for worktree '${worktreeName}':`);
+      // Show port summary in concise mode
+      const portList = Object.entries(ports).map(([s, p]) => `${s}:${p}`).join(', ');
+      output.success('ports', `${worktreeName}: ${portList}`);
+      
+      // Detailed view in verbose mode
+      if (options.verbose) {
+        output.raw(`\nPorts for worktree '${worktreeName}':`);
       
       for (const [service, port] of Object.entries(ports)) {
         let status = '';
@@ -41,8 +50,9 @@ async function portsCommand(worktreeName) {
           // Port checking might fail in some environments
           status = '';
         }
-        console.log(`  ${service}: ${port}${status}`);
+        output.raw(`  ${service}: ${port}${status}`);
       }
+    }
       
       const conflicts = [];
       for (const [service, port] of Object.entries(ports)) {
@@ -60,9 +70,11 @@ async function portsCommand(worktreeName) {
       }
       
       if (conflicts.length > 0) {
-        console.log('\n⚠ Port conflicts detected:');
-        for (const { service, port } of conflicts) {
-          console.log(`  ${service} port ${port} is in use by another process`);
+        output.warning('ports', `${conflicts.length} port conflicts detected`);
+        if (options.verbose) {
+          for (const { service, port } of conflicts) {
+            output.raw(`  ${service} port ${port} is in use by another process`);
+          }
         }
         
         const { reassign } = await inquirer.prompt([{
@@ -80,7 +92,7 @@ async function portsCommand(worktreeName) {
               const newPort = portManager.findAvailablePort(range, allPorts);
               ports[service] = newPort;
               allPorts.push(newPort);
-              console.log(`✓ Reassigned ${service} to port ${newPort}`);
+              output.success('ports', `reassigned ${service} to port ${newPort}`);
             }
           }
           
@@ -96,44 +108,54 @@ async function portsCommand(worktreeName) {
       const allPorts = portManager.getAllPorts();
       
       if (Object.keys(allPorts).length === 0) {
-        console.log('No port assignments found');
+        output.success('ports', 'no port assignments found');
         return;
       }
       
-      console.log('\nPort assignments for all worktrees:');
-      console.log('─'.repeat(50));
+      // Concise summary
+      const totalWorktrees = Object.keys(allPorts).length;
+      const totalPorts = portManager.getAllUsedPorts().length;
+      output.success('ports', `${totalWorktrees} worktrees using ${totalPorts} ports`);
       
-      for (const [worktreeName, ports] of Object.entries(allPorts)) {
-        console.log('\n' + worktreeName);
+      // Detailed view in verbose mode
+      if (options.verbose) {
+        output.raw('\nPort assignments for all worktrees:');
+        output.raw('─'.repeat(50));
         
-        for (const [service, port] of Object.entries(ports)) {
-          let status = '';
-          try {
-            const isInUse = await portManager.isPortInUse(port);
-            status = isInUse ? ' ✓' : '';
-          } catch (error) {
-            // Port checking might fail in some environments (e.g., CI)
-            // Just continue without the status indicator
+        for (const [worktreeName, ports] of Object.entries(allPorts)) {
+          output.raw('\n' + worktreeName);
+          
+          for (const [service, port] of Object.entries(ports)) {
+            let status = '';
+            try {
+              const isInUse = await portManager.isPortInUse(port);
+              status = isInUse ? ' ✓' : '';
+            } catch (error) {
+              // Port checking might fail in some environments (e.g., CI)
+              // Just continue without the status indicator
+            }
+            output.raw(`  ${service}: ${port}${status}`);
           }
-          console.log(`  ${service}: ${port}${status}`);
         }
       }
       
-      const usedPorts = portManager.getAllUsedPorts();
-      console.log('\n' + `Total ports in use: ${usedPorts.length}`);
-      
-      console.log('\n' + 'Port ranges:');
-      if (cfg.portRanges) {
-        for (const [service, range] of Object.entries(cfg.portRanges)) {
-          console.log(`  ${service}: ${range.start}-${range.start + 100} (increment: ${range.increment})`);
+      if (options.verbose) {
+        const usedPorts = portManager.getAllUsedPorts();
+        output.raw('\n' + `Total ports in use: ${usedPorts.length}`);
+        
+        output.raw('\n' + 'Port ranges:');
+        if (cfg.portRanges) {
+          for (const [service, range] of Object.entries(cfg.portRanges)) {
+            output.raw(`  ${service}: ${range.start}-${range.start + 100} (increment: ${range.increment})`);
+          }
         }
       }
     }
     
   } catch (error) {
-    console.error(chalk.red('Error:'), error.message);
+    output.error('ports', error.message);
     const context = addCommandContext(error.message, 'ports');
-    if (context.tips && context.tips.length > 0) {
+    if (context.tips && context.tips.length > 0 && options.verbose) {
       console.error(chalk.yellow('\nTips:'));
       context.tips.forEach(tip => console.error(chalk.gray(`  • ${tip}`)));
     }

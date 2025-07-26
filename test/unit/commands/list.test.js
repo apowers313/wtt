@@ -51,7 +51,7 @@ describe('list command', () => {
 
     await listCommand({});
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('No worktrees found.');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt list: no worktrees found');
     expect(mockProcessExit).not.toHaveBeenCalled();
   });
 
@@ -77,10 +77,7 @@ describe('list command', () => {
 
     await listCommand({});
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nWorktrees:');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  wt-feature-1 (feature-1) - vite:3000 storybook:6006');
-    expect(mockConsoleLog).toHaveBeenCalledWith('  wt-feature-2 (feature-2) - vite:3010 storybook:6016');
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nUse --verbose for detailed information');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt list: found 2 worktrees: wt-feature-1, wt-feature-2');
   });
 
   test('lists worktrees with verbose information', async () => {

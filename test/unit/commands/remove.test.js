@@ -76,10 +76,9 @@ describe('remove command', () => {
       path.join('/test/repo', '.worktrees', 'wt-feature'),
       true
     );
-    expect(mockConsoleLog).toHaveBeenCalledWith('✓ Removed worktree');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt remove: removed worktree \'wt-feature\'');
     expect(portManager.releasePorts).toHaveBeenCalledWith('wt-feature');
-    expect(mockConsoleLog).toHaveBeenCalledWith('✓ Released ports vite:3000');
-    expect(mockConsoleLog).toHaveBeenCalledWith('\nNote: Branch \'feature\' still exists.');
+    // Port release and branch note messages are now only shown in verbose mode
   });
 
   test('prompts for confirmation with uncommitted changes', async () => {
@@ -108,7 +107,7 @@ describe('remove command', () => {
 
     await removeCommand('wt-nonexistent', {});
 
-    expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'Worktree \'wt-nonexistent\' doesn\'t exist. Use \'wt list\' to see available worktrees');
+    expect(mockConsoleError).toHaveBeenCalledWith('wt remove: error: Worktree \'wt-nonexistent\' doesn\'t exist. Use \'wt list\' to see available worktrees');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 
@@ -128,8 +127,7 @@ describe('remove command', () => {
 
     await removeCommand('wt-broken', { force: true });
 
-    expect(mockConsoleLog).toHaveBeenCalledWith('✓ Removed worktree');
-    expect(mockConsoleLog).toHaveBeenCalledWith('✓ Cleaned up broken worktree registration');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt remove: cleaned up broken worktree \'wt-broken\'');
   });
 
   test('removes worktree with force flag', async () => {
@@ -154,7 +152,7 @@ describe('remove command', () => {
       path.join('/test/repo', '.worktrees', 'wt-feature'),
       true
     );
-    expect(mockConsoleLog).toHaveBeenCalledWith('✓ Removed worktree');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt remove: removed worktree \'wt-feature\'');
   });
 
   test('cleans up orphaned worktree directory', async () => {
@@ -171,7 +169,7 @@ describe('remove command', () => {
       path.join('/test/repo', '.worktrees', 'wt-orphaned'),
       { recursive: true }
     );
-    expect(mockConsoleLog).toHaveBeenCalledWith('✓ Removed worktree directory');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt remove: removed worktree \'wt-orphaned\'');
     expect(portManager.releasePorts).toHaveBeenCalledWith('wt-orphaned');
   });
 
@@ -235,7 +233,7 @@ describe('remove command', () => {
 
     await removeCommand('wt-feature', {});
 
-    expect(mockConsoleError).toHaveBeenCalledWith('Error:', 'Repository validation failed');
+    expect(mockConsoleError).toHaveBeenCalledWith('wt remove: error: Repository validation failed');
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 
@@ -256,6 +254,6 @@ describe('remove command', () => {
     await removeCommand('wt-feature', { force: true });
 
     expect(gitOps.removeWorktree).toHaveBeenCalled();
-    expect(mockConsoleLog).toHaveBeenCalledWith('✓ Removed worktree');
+    expect(mockConsoleLog).toHaveBeenCalledWith('wt remove: removed worktree \'wt-feature\'');
   });
 });

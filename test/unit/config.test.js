@@ -116,6 +116,12 @@ describe('Config module (integration)', () => {
 
   describe('init', () => {
     test('creates config with default values', async () => {
+      // Get the actual default branch name from git
+      const defaultBranch = execSync('git symbolic-ref HEAD', { cwd: tempDir })
+        .toString()
+        .trim()
+        .replace('refs/heads/', '');
+      
       const result = await config.init();
       
       expect(result).toMatchObject({
@@ -125,7 +131,7 @@ describe('Config module (integration)', () => {
           storybook: { start: 6006, increment: 10 },
           custom: { start: 8000, increment: 10 }
         },
-        mainBranch: 'main',
+        mainBranch: defaultBranch,
         namePattern: '{branch}'
       });
       
@@ -133,7 +139,7 @@ describe('Config module (integration)', () => {
       const fileContent = await fs.readJSON('.worktree-config.json');
       expect(fileContent).toMatchObject({
         baseDir: '.worktrees',
-        mainBranch: 'main'
+        mainBranch: defaultBranch
       });
     });
 

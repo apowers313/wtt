@@ -10,6 +10,7 @@ jest.mock('../../../lib/merge-helper/backup-manager');
 jest.mock('../../../lib/merge-helper/conflict-detector');
 jest.mock('../../../lib/ui/progress-ui');
 jest.mock('../../../lib/currentWorktree');
+jest.mock('../../../lib/rootFinder');
 jest.mock('simple-git');
 jest.mock('inquirer', () => ({
   prompt: jest.fn()
@@ -32,6 +33,7 @@ const MessageFormatter = require('../../../lib/merge-helper/message-formatter');
 const BackupManager = require('../../../lib/merge-helper/backup-manager');
 const ConflictDetector = require('../../../lib/merge-helper/conflict-detector');
 const ProgressUI = require('../../../lib/ui/progress-ui');
+const rootFinder = require('../../../lib/rootFinder');
 const simpleGit = require('simple-git');
 
 describe('merge command', () => {
@@ -97,13 +99,19 @@ describe('merge command', () => {
       fail: jest.fn()
     });
     
-    // Mock simple-git
-    const mockGit = {
+    // Mock rootFinder
+    rootFinder.getMainRepoRoot = jest.fn().mockResolvedValue('/test/repo');
+    
+    // Mock simple-git (this will be the mainGit instance)
+    const mockMainGit = {
       status: jest.fn().mockResolvedValue({
+        current: 'feature', // Start on feature branch so checkout gets called
         files: []
-      })
+      }),
+      checkout: jest.fn().mockResolvedValue(),
+      merge: jest.fn().mockResolvedValue()
     };
-    simpleGit.mockReturnValue(mockGit);
+    simpleGit.mockReturnValue(mockMainGit);
   });
 
   afterEach(() => {
@@ -138,8 +146,10 @@ describe('merge command', () => {
 
     await mergeCommand('wt-feature', { push: true, delete: true });
 
-    expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-    expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+    // Get the mocked mainGit instance
+    const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+    expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
     expect(mockConsoleLog).toHaveBeenCalledWith('✓ Switched to branch \'main\'');
     expect(mockConsoleLog).toHaveBeenCalledWith('✓ Merged \'feature\'');
     expect(gitOps.removeWorktree).toHaveBeenCalled();
@@ -208,7 +218,9 @@ describe('merge command', () => {
     gitOps.checkBranchExists = jest.fn().mockResolvedValue(true);
     gitOps.getCurrentBranch = jest.fn().mockResolvedValue('main');
     gitOps.getMainBranch = jest.fn().mockResolvedValue('main');
-    gitOps.git.merge = jest.fn().mockRejectedValue(new Error('CONFLICT'));
+    // Update the mainGit mock to reject with conflict error
+    const mockMainGit = simpleGit();
+    mockMainGit.merge.mockRejectedValue(new Error('CONFLICT'));
 
     await mergeCommand('wt-feature', {});
 
@@ -238,8 +250,9 @@ describe('merge command', () => {
 
     await mergeCommand('wt-feature', {});
 
-    expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-    expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+    const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+    expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
   });
 
   test('handles merge error', async () => {
@@ -257,7 +270,9 @@ describe('merge command', () => {
     gitOps.hasUncommittedChanges = jest.fn().mockResolvedValue(false);
     gitOps.hasUnpushedCommits = jest.fn().mockResolvedValue(false);
     gitOps.getMainBranch = jest.fn().mockResolvedValue('main');
-    gitOps.git.merge = jest.fn().mockRejectedValue(new Error('Branch not found'));
+    // Update the mainGit mock to reject with branch not found error
+    const mockMainGit = simpleGit();
+    mockMainGit.merge.mockRejectedValue(new Error('Branch not found'));
 
     await mergeCommand('wt-feature', {});
 
@@ -288,8 +303,9 @@ describe('merge command', () => {
 
     await mergeCommand('wt-feature', {});
 
-    expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-    expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+    const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+    expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
   });
 
   describe('autoCleanup behavior', () => {
@@ -323,8 +339,9 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', {});
 
-      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+      const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+      expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
       expect(gitOps.removeWorktree).toHaveBeenCalled();
       expect(gitOps.deleteBranch).toHaveBeenCalledWith('feature');
       expect(portManager.releasePorts).toHaveBeenCalledWith('wt-feature');
@@ -338,8 +355,9 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', {});
 
-      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+      const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+      expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
       expect(gitOps.removeWorktree).not.toHaveBeenCalled();
       expect(gitOps.deleteBranch).not.toHaveBeenCalled();
       expect(portManager.releasePorts).not.toHaveBeenCalled();
@@ -353,8 +371,9 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', { delete: true });
 
-      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+      const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+      expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
       expect(gitOps.removeWorktree).toHaveBeenCalled();
       expect(gitOps.deleteBranch).toHaveBeenCalledWith('feature');
       expect(portManager.releasePorts).toHaveBeenCalledWith('wt-feature');
@@ -368,8 +387,9 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', { delete: false });
 
-      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+      const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+      expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
       expect(gitOps.removeWorktree).not.toHaveBeenCalled();
       expect(gitOps.deleteBranch).not.toHaveBeenCalled();
       expect(portManager.releasePorts).not.toHaveBeenCalled();
@@ -389,8 +409,9 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', { delete: true });
 
-      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+      const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+      expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
       expect(inquirer.prompt).toHaveBeenCalledWith([{
         type: 'confirm',
         name: 'confirmDelete',
@@ -417,8 +438,9 @@ describe('merge command', () => {
 
       await mergeCommand('wt-feature', {});
 
-      expect(gitOps.git.checkout).toHaveBeenCalledWith('main');
-      expect(gitOps.git.merge).toHaveBeenCalledWith(['feature']);
+      const mockMainGit = simpleGit();
+    expect(mockMainGit.checkout).toHaveBeenCalledWith('main');
+      expect(mockMainGit.merge).toHaveBeenCalledWith(['feature']);
       expect(inquirer.prompt).not.toHaveBeenCalled();
       expect(gitOps.removeWorktree).toHaveBeenCalled();
       

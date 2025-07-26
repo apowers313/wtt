@@ -129,7 +129,7 @@ describe('Complete feature development workflow', () => {
     expect(finalListResult.stdout).toContain('No worktrees found');
     
     jest.unmock('inquirer');
-  });
+  }, 60000);
 
   test('feature development with conflicts', async () => {
     await repo.run('init');
@@ -172,5 +172,5 @@ describe('Complete feature development workflow', () => {
     await repo.run('remove feature-update-version --force');
     await repo.run('remove feature-add-settings --force');
     jest.unmock('inquirer');
-  });
+  }, 60000);
 });

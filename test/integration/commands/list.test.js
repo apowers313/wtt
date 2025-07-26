@@ -94,7 +94,7 @@ describe('wt list command', () => {
     const result = await repo.run('list');
     
     helpers.expectSuccess(result);
-    helpers.expectOutputContains(result, ['no worktrees', 'No worktrees found', 'empty']);
+    helpers.expectOutputContains(result, ['wt list: no worktrees found']);
   });
 
   test('shows port assignments', async () => {
@@ -121,8 +121,7 @@ describe('wt list command', () => {
     console.log('[DEBUG] ports test - List stderr:', result.stderr);
     
     helpers.expectSuccess(result);
-    // Port display might vary
-    helpers.expectOutputContains(result, ['vite', 'storybook']);
-    helpers.expectOutputContains(result, [':3', ':6']); // Port numbers
+    // New concise output format shows summary
+    helpers.expectOutputContains(result, ['wt list: found 1 worktrees']);
   });
 });
